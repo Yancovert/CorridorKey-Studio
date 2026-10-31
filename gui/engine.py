@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import re
 import sys
+import signal
+import time
 import subprocess
 from pathlib import Path
 
@@ -13,7 +15,9 @@ import cv2
 
 class KeyerEngineWorker(QThread):
     progress_changed = Signal(int, int, str) # current, total, status
+    progress_update = Signal(int, str) # percent (0-100), message
     log_received = Signal(str)
+    log_output = Signal(str) # alias for main_window
     frame_preview_ready = Signal(object, object) # original, keyed
     preview_bundle_ready = Signal(dict) # dict containing all preview modes
     finished = Signal(bool, str, dict) # success, message, outputs
@@ -62,7 +66,7 @@ class KeyerEngineWorker(QThread):
         **kwargs,
     ):
         super().__init__(parent)
-        # support argument aliases
+        # support argument aliases from main_window
         if "scale" in kwargs:
             model_scale = kwargs["scale"]
         if "foundation_chunk" in kwargs:
@@ -77,6 +81,26 @@ class KeyerEngineWorker(QThread):
             low_vram_mlp_chunk_tokens = kwargs["mlp_chunk"]
         if "attn_chunk" in kwargs and kwargs["attn_chunk"]:
             low_vram_full_attn_query_chunk_tokens = kwargs["attn_chunk"]
+        if "despill" in kwargs:
+            despill_strength = kwargs["despill"]
+        if "deliverable_format" in kwargs:
+            blender_preset = kwargs["deliverable_format"]
+        if "carry_quality" in kwargs:
+            carry_hint_quality = kwargs["carry_quality"]
+
+        # handle hint_path and mode from gui
+        hint_path = kwargs.get("hint_path")
+        mode = kwargs.get("mode", "")
+        if hint_path and Path(hint_path).exists():
+            if "First Frame" in mode or mode == "First Frame Mask":
+                hint_first_frame = str(hint_path)
+            elif "Video" in mode or mode == "Video Mask Sequence":
+                hint_video = str(hint_path)
+            elif not hint_first_frame and not hint_video:
+                if Path(hint_path).suffix.lower() in (".mp4", ".mov", ".mkv", ".webm", ".avi"):
+                    hint_video = str(hint_path)
+                else:
+                    hint_first_frame = str(hint_path)
 
         self.input_path = Path(input_path)
         self.output_dir = Path(output_dir)
@@ -120,20 +144,67 @@ class KeyerEngineWorker(QThread):
         self._process: subprocess.Popen | None = None
         self._is_cancelled = False
 
+    def _emit_progress(self, current: int, total: int, status: str):
+        pct = max(0, min(100, int((current / max(1, total)) * 100)))
+        self.progress_changed.emit(current, total, status)
+        self.progress_update.emit(pct, status)
+
+    def _emit_log(self, text: str):
+        self.log_received.emit(text)
+        self.log_output.emit(text)
+
     def cancel(self):
         self._is_cancelled = True
-        if self._process and self._process.poll() is None:
-            # terminate child process and all ffmpeg pipes
+        self._terminate_process_tree()
+
+    def _terminate_process_tree(self):
+        proc = self._process
+        if not proc:
+            return
+
+        if proc.poll() is not None:
+            return
+
+        pid = proc.pid
+        if sys.platform == "win32":
             try:
-                self._process.terminate()
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=1.0
+                )
             except Exception:
-                pass
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        else:
+            try:
+                pgid = os.getpgid(pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+        try:
+            proc.wait(timeout=0.2)
+        except Exception:
+            pass
+
+        try:
+            if proc.stdout and not proc.stdout.closed:
+                proc.stdout.close()
+        except Exception:
+            pass
 
     def run(self):
         try:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            self.log_received.emit(f"initializing keying for: {self.input_path.name}")
-            self.progress_changed.emit(0, 100, "Preparing inference...")
+            self._emit_log(f"initializing keying for: {self.input_path.name}")
+            self._emit_progress(0, 100, "Preparing inference...")
 
             repo_root = Path(__file__).resolve().parents[1]
             infer_script = repo_root / "infer.py"
@@ -231,73 +302,102 @@ class KeyerEngineWorker(QThread):
             if self.ffmpeg_threads != 2:
                 cmd.extend(["--ffmpeg_threads", str(self.ffmpeg_threads)])
 
-            self.log_received.emit("executing: " + " ".join(cmd))
+            self._emit_log("executing: " + " ".join(cmd))
 
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
 
-            self._process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                cwd=str(repo_root),
-                env=env,
-            )
+            popen_kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+                "bufsize": 1,
+                "cwd": str(repo_root),
+                "env": env,
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP") else 0
+                )
+            else:
+                popen_kwargs["start_new_session"] = True
 
-            current_frame = 0
+            self._process = subprocess.Popen(cmd, **popen_kwargs)
+
             total_frames = 100
             tqdm_pattern = re.compile(r"(\d+)/(\d+)")
 
-            for line in self._process.stdout:
+            while True:
                 if self._is_cancelled:
+                    break
+                try:
+                    line = self._process.stdout.readline()
+                except (ValueError, OSError):
+                    break
+                if not line:
                     break
                 clean_line = line.strip()
                 if not clean_line:
                     continue
-                self.log_received.emit(clean_line)
+                self._emit_log(clean_line)
 
                 # parse stage progress and sliding window progress
-                if "Loading CorridorKey v2 runtime weights" in clean_line:
-                    self.progress_changed.emit(5, 100, "Loading foundation weights into VRAM (~5 GB)...")
+                match = tqdm_pattern.search(clean_line)
+                if "CorridorKey backend process started" in clean_line:
+                    self._emit_progress(2, 100, "Backend process initialized...")
+                elif "Importing PyTorch runtime" in clean_line:
+                    self._emit_progress(5, 100, "Importing neural network runtime...")
+                elif "CUDA accelerator active" in clean_line:
+                    self._emit_progress(8, 100, "CUDA initialized, loading weights...")
+                elif "Loading CorridorKey v2 runtime weights" in clean_line:
+                    self._emit_progress(12, 100, "Loading foundation weights into VRAM (~5 GB)...")
+                elif "loaded weights" in clean_line:
+                    self._emit_progress(18, 100, "Weights loaded, analyzing input media...")
+                elif "Auto VRAM:" in clean_line:
+                    self._emit_progress(20, 100, "Configuring VRAM chunk windows...")
                 elif "RVM continuous prepass" in clean_line:
-                    self.progress_changed.emit(15, 100, "Stage 1/3: RVM recurrent temporal prepass...")
+                    self._emit_progress(25, 100, "Stage 1/3: RVM recurrent temporal prepass...")
                 elif "frozen VFM prepass" in clean_line:
-                    self.progress_changed.emit(35, 100, "Stage 2/3: Extracting C-RADIO & MoGe geometry features...")
+                    self._emit_progress(40, 100, "Stage 2/3: Extracting C-RADIO & MoGe geometry features...")
                 elif "Hann stage1" in clean_line:
-                    self.progress_changed.emit(50, 100, "Stage 3/3: Running temporal transformer attention...")
+                    self._emit_progress(55, 100, "Stage 3/3: Running temporal transformer attention...")
                 elif "window" in clean_line and match:
                     try:
                         cur = int(match.group(1))
                         tot = int(match.group(2))
                         if tot > 0:
-                            pct = 50 + int((cur / tot) * 45)
-                            self.progress_changed.emit(pct, 100, f"Processing window {cur}/{tot} ({int(cur/tot*100)}%)")
+                            pct = 55 + int((cur / tot) * 38)
+                            self._emit_progress(pct, 100, f"Processing window {cur}/{tot} ({int(cur/tot*100)}%)")
                     except ValueError:
                         pass
                 elif "wrote" in clean_line and "output video" in clean_line:
-                    self.progress_changed.emit(95, 100, "Finalizing outputs and encoding containers...")
+                    self._emit_progress(95, 100, "Finalizing outputs and encoding containers...")
                 elif match:
                     try:
                         cur = int(match.group(1))
                         tot = int(match.group(2))
                         if tot > 0:
-                            self.progress_changed.emit(cur, tot, f"Processing {cur}/{tot}")
+                            self._emit_progress(cur, tot, f"Processing {cur}/{tot}")
                     except ValueError:
                         pass
 
-            self._process.wait()
-
             if self._is_cancelled:
-                self.finished.emit(False, "Process cancelled by user.", {})
+                self._terminate_process_tree()
+                self._emit_log("keying cancelled by user")
+                self.finished.emit(False, "Keying cancelled by user.", {})
                 return
+
+            try:
+                self._process.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                self._terminate_process_tree()
 
             if self._process.returncode != 0:
                 self.finished.emit(False, f"Inference failed with code {self._process.returncode}", {})
                 return
 
-            self.progress_changed.emit(total_frames, total_frames, "Finalizing outputs...")
+            self._emit_progress(total_frames, total_frames, "Finalizing outputs...")
 
             # find generated preview videos
             stem = self.input_path.stem
@@ -324,56 +424,56 @@ class KeyerEngineWorker(QThread):
             }
 
             if self.blender_preset == "prores4444" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("encoding blender prores 4444 rgba container...")
+                self._emit_log("encoding blender prores 4444 rgba container...")
                 prores_file = self.output_dir / f"{stem}_keyed_prores4444.mov"
                 if export_prores4444_rgba(fg_path, alpha_path, prores_file):
                     output_summary["prores4444"] = str(prores_file)
-                    self.log_received.emit(f"created: {prores_file.name}")
+                    self._emit_log(f"created: {prores_file.name}")
                     if self.generate_blender_script:
                         script_path = self.output_dir / "import_to_blender.py"
                         generate_blender_import_script(prores_file, script_path, is_sequence=False)
                         output_summary["blender_script"] = str(script_path)
 
             elif self.blender_preset == "png_seq" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("exporting blender transparent png sequence...")
+                self._emit_log("exporting blender transparent png sequence...")
                 png_seq_dir = self.output_dir / f"{stem}_png_sequence"
                 if export_png_rgba_sequence(fg_path, alpha_path, png_seq_dir):
                     output_summary["png_sequence"] = str(png_seq_dir)
-                    self.log_received.emit(f"created png sequence in: {png_seq_dir.name}")
+                    self._emit_log(f"created png sequence in: {png_seq_dir.name}")
                     if self.generate_blender_script:
                         script_path = self.output_dir / "import_to_blender.py"
                         generate_blender_import_script(png_seq_dir / "frame_00001.png", script_path, is_sequence=True)
                         output_summary["blender_script"] = str(script_path)
 
             elif self.blender_preset == "webm_vp9" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("encoding webm vp9 transparent video...")
+                self._emit_log("encoding webm vp9 transparent video...")
                 webm_file = self.output_dir / f"{stem}_keyed_vp9.webm"
                 if export_webm_vp9_rgba(fg_path, alpha_path, webm_file):
                     output_summary["webm_vp9"] = str(webm_file)
-                    self.log_received.emit(f"created: {webm_file.name}")
+                    self._emit_log(f"created: {webm_file.name}")
 
             elif self.blender_preset == "qtrle" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("encoding quicktime animation lossless rgba container...")
+                self._emit_log("encoding quicktime animation lossless rgba container...")
                 qtrle_file = self.output_dir / f"{stem}_keyed_animation.mov"
                 if export_qtrle_rgba(fg_path, alpha_path, qtrle_file):
                     output_summary["qtrle"] = str(qtrle_file)
-                    self.log_received.emit(f"created: {qtrle_file.name}")
+                    self._emit_log(f"created: {qtrle_file.name}")
 
             elif self.blender_preset == "tiff_seq" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("exporting 16-bit uncompressed tiff sequence...")
+                self._emit_log("exporting 16-bit uncompressed tiff sequence...")
                 tiff_dir = self.output_dir / f"{stem}_tiff_sequence"
                 if export_tiff_rgba_sequence(fg_path, alpha_path, tiff_dir):
                     output_summary["tiff_sequence"] = str(tiff_dir)
-                    self.log_received.emit(f"created tiff sequence in: {tiff_dir.name}")
+                    self._emit_log(f"created tiff sequence in: {tiff_dir.name}")
 
             elif self.blender_preset == "davinci_pack" and fg_path.exists() and alpha_path.exists():
-                self.log_received.emit("exporting davinci resolve dual-track matte & fill pack...")
+                self._emit_log("exporting davinci resolve dual-track matte & fill pack...")
                 fill_file = self.output_dir / f"{stem}_fill_prores422hq.mov"
                 matte_file = self.output_dir / f"{stem}_matte_prores422.mov"
                 if export_davinci_pack(fg_path, alpha_path, fill_file, matte_file):
                     output_summary["davinci_fill"] = str(fill_file)
                     output_summary["davinci_matte"] = str(matte_file)
-                    self.log_received.emit(f"created: {fill_file.name} and {matte_file.name}")
+                    self._emit_log(f"created: {fill_file.name} and {matte_file.name}")
 
             # extract preview frames from outputs to update canvas
             self._load_and_emit_preview_frames(alpha_path, fg_path, cutout_path)

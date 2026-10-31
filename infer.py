@@ -8,6 +8,9 @@ import tempfile
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
+print("CorridorKey backend process started.", flush=True)
+print("Importing PyTorch runtime and loading foundation models...", flush=True)
+
 from pathlib import Path
 
 import torch
@@ -119,6 +122,9 @@ def main():
 
     if not torch.cuda.is_available():
         raise RuntimeError("CorridorKey v2 runtime requires a CUDA GPU.")
+    dev_name = torch.cuda.get_device_name(0)
+    free_bytes, total_bytes = torch.cuda.mem_get_info()
+    print(f"CUDA accelerator active: {dev_name} ({free_bytes / (1024**3):.1f} GB free / {total_bytes / (1024**3):.1f} GB total)", flush=True)
     require_ffmpeg(args.ffmpeg_bin)
     package_root = Path(__file__).resolve().parent
     paths = RuntimePaths.from_package(package_root, args.weights)

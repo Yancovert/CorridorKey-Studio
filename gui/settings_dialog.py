@@ -39,8 +39,8 @@ class SettingsDialog(QDialog):
     def _setup_theme(self):
         self.setStyleSheet("""
             QDialog {
-                background-color: #0b0e14;
-                color: #e6edf3;
+                background-color: #1a1d21;
+                color: #dce1e7;
                 font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
             QScrollArea {
@@ -48,33 +48,33 @@ class SettingsDialog(QDialog):
                 border: none;
             }
             QGroupBox {
-                background-color: #12151a;
-                border: 1px solid #21262d;
+                background-color: #21252b;
+                border: 1px solid #2e343d;
                 border-radius: 5px;
-                margin-top: 16px;
-                padding: 14px 12px 10px 12px;
+                margin-top: 14px;
+                padding: 12px 10px 8px 10px;
                 font-weight: 600;
                 font-size: 11.5px;
-                color: #c9d1d9;
+                color: #b0bac5;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                padding: 0px 6px;
+                padding: 0px 4px;
                 left: 8px;
-                top: 2px;
-                background-color: #0b0e14;
-                color: #8b949e;
+                top: 1px;
+                background-color: #1a1d21;
+                color: #7f8a96;
                 font-size: 11px;
                 font-weight: 600;
             }
             QComboBox, QSpinBox, QDoubleSpinBox {
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                padding: 5px 10px;
-                color: #f0f6fc;
-                font-size: 12px;
+                padding: 4px 8px;
+                color: #e6eaef;
+                font-size: 11.5px;
                 min-height: 22px;
             }
             QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {
@@ -82,16 +82,16 @@ class SettingsDialog(QDialog):
                 background-color: #1c212a;
             }
             QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-                border-color: #385175;
+                border-color: #3b82f6;
             }
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 24px;
-                border-left: 1px solid #30363d;
+                border-left: 1px solid #333942;
                 border-top-right-radius: 4px;
                 border-bottom-right-radius: 4px;
-                background-color: #1b212a;
+                background-color: #1a1f26;
             }
             QComboBox::down-arrow {
                 width: 0px;
@@ -102,46 +102,46 @@ class SettingsDialog(QDialog):
                 margin-right: 2px;
             }
             QComboBox QAbstractItemView {
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                color: #f0f6fc;
-                selection-background-color: #26354a;
+                color: #e6eaef;
+                selection-background-color: #2b394e;
                 selection-color: #ffffff;
                 padding: 4px;
             }
             QCheckBox {
-                color: #c9d1d9;
-                font-size: 12px;
+                color: #b0bac5;
+                font-size: 11.5px;
                 spacing: 8px;
             }
             QCheckBox::indicator {
-                width: 15px;
-                height: 15px;
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                width: 14px;
+                height: 14px;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 3px;
             }
             QCheckBox::indicator:hover {
                 border-color: #484f58;
             }
             QCheckBox::indicator:checked {
-                background-color: #27384e;
-                border-color: #3e5677;
+                background-color: #2b394e;
+                border-color: #3b82f6;
             }
             QPushButton {
-                background-color: #161b22;
-                color: #c9d1d9;
-                border: 1px solid #30363d;
+                background-color: #21252b;
+                color: #b0bac5;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                padding: 6px 14px;
-                font-size: 12px;
+                padding: 5px 12px;
+                font-size: 11.5px;
                 font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #21262d;
+                background-color: #282d35;
                 border-color: #484f58;
-                color: #f0f6fc;
+                color: #ffffff;
             }
         """)
 
@@ -384,9 +384,9 @@ class SettingsDialog(QDialog):
 
         btn_save_default = QPushButton("Save Default")
         btn_save_default.setStyleSheet(
-            "QPushButton { background-color: #26354a; color: #f0f6fc; font-weight: 600; "
-            "border: 1px solid #385175; border-radius: 4px; padding: 6px 16px; } "
-            "QPushButton:hover { background-color: #314460; border-color: #466794; }"
+            "QPushButton { background-color: #2e4363; color: #ffffff; font-weight: 600; "
+            "border: 1px solid #3b82f6; border-radius: 4px; padding: 5px 14px; font-size: 11.5px; } "
+            "QPushButton:hover { background-color: #3b547c; border-color: #60a5fa; }"
         )
         btn_save_default.clicked.connect(self._on_save_as_default)
         btn_bar.addWidget(btn_save_default)
