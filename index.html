@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CorridorKey Studio - Desktop Chroma Keying Workstation</title>
   <link rel="icon" type="image/png" href="gui/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #000000;
@@ -17,7 +20,7 @@
       --accent-hover: #388e3c;
       --accent-border: #4caf50;
       --font-mono: "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-sans: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
     * {
@@ -293,7 +296,7 @@
         <strong>Drop your footage:</strong> Drag an MP4, MOV, or image sequence folder into the drop area. The app reads video dimensions, frame count, and checks for companion hint files automatically.
       </li>
       <li>
-        <strong>Pick a workflow preset:</strong> Select <code>Balanced Studio</code> for standard shots, <code>Maximum Quality</code> for thin hair strands and motion blur, or <code>Low-VRAM Staged</code> if working on a 4GB or 6GB GPU.
+        <strong>Pick a workflow preset:</strong> Select <code>Balanced Studio</code> for hardware-optimized processing, <code>Maximum Quality</code> for fine hair strands and edge detail, <code>High-Performance Workstation</code> for multi-batch throughput on 24GB+ cards (RTX 3090/4090, A6000, A100), <code>Fast Turnaround</code> for quick reviews, or <code>Low-VRAM Staged</code> on 4GB-6GB laptop GPUs.
       </li>
       <li>
         <strong>Preview and scrub:</strong> Drag the split handle on the canvas to inspect the matte against the green background. Hit Spacebar or the play button to scrub through frames and check temporal consistency.
@@ -369,12 +372,12 @@
       </thead>
       <tbody>
         <tr>
-          <td>GPU</td>
-          <td>NVIDIA GeForce or RTX GPU with CUDA support.</td>
+          <td>GPU Architecture</td>
+          <td>NVIDIA GeForce, RTX, Quadro, or Tesla GPU with CUDA support.</td>
         </tr>
         <tr>
-          <td>VRAM</td>
-          <td>4 GB minimum. The app monitors memory usage and switches to staged inference with smaller frame chunks so 1080p clips do not trigger CUDA out-of-memory errors on 4GB-6GB cards.</td>
+          <td>Hardware Tiers</td>
+          <td>Adaptive 5-tier scaling (Entry 4GB, Mid-Range 6GB, Desktop 8-10GB, High-End 12-16GB, and Ultra Workstation 24-80GB). Automatically tunes Stage-2 batch sizes, Swin window batches, and Foundation chunking to maximize throughput without memory bottlenecks.</td>
         </tr>
         <tr>
           <td>Software</td>
@@ -382,7 +385,7 @@
         </tr>
         <tr>
           <td>Branch Updates</td>
-          <td>Linux installations track and update from <code>app-linux</code>. Windows installations track and update from <code>app-win</code>.</td>
+          <td>Linux installations track and update from <code>app-linux</code>. Windows installations track and update from <code>app-win</code>. When an update is detected, an OLED notification banner displays live download progress with automatic Git sync and zip fallback.</td>
         </tr>
       </tbody>
     </table>
