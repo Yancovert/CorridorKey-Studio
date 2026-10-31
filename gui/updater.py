@@ -81,57 +81,64 @@ class UpdateInstallWorker(QThread):
         self.branch = branch
         self.remote_commit = remote_commit
 
+    def _extract_zip_archive(self):
+        self.progress.emit(35, f"Downloading update package for {self.branch}...")
+        archive_url = f"https://github.com/Yancovert/CorridorKey-Studio/archive/refs/heads/{self.branch}.zip"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = Path(tmp_dir) / "update.zip"
+            urllib.request.urlretrieve(archive_url, zip_path)
+
+            self.progress.emit(65, "Extracting updated source files...")
+            with zipfile.ZipFile(zip_path, "r") as z:
+                z.extractall(tmp_dir)
+
+            extracted_dirs = [d for d in Path(tmp_dir).iterdir() if d.is_dir() and d.name.startswith("CorridorKey-Studio")]
+            if not extracted_dirs:
+                raise RuntimeError("Failed to locate extracted update directory.")
+
+            source_dir = extracted_dirs[0]
+            self.progress.emit(85, "Applying files to application directory...")
+
+            sync_items = ["corridorkey", "gui", "scripts", "infer.py", "run_interactive.py", "launch_gui.sh", "launch_gui.bat", "requirements.txt"]
+            for item in sync_items:
+                src_item = source_dir / item
+                dst_item = self.app_root / item
+                if src_item.is_dir():
+                    shutil.copytree(src_item, dst_item, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                elif src_item.is_file():
+                    shutil.copy2(src_item, dst_item)
+
     def run(self):
         try:
-            self.progress.emit(10, "Checking local installation...")
+            self.progress.emit(10, "Verifying local installation...")
             git_dir = self.app_root / ".git"
 
+            updated_via_git = False
             if git_dir.is_dir():
-                # git repository in-place pull strictly for platform branch
-                self.progress.emit(30, f"Pulling latest commits from origin/{self.branch}...")
-                pull_cmd = ["git", "-C", str(self.app_root), "pull", "origin", self.branch]
-                res = subprocess.run(pull_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
-                if res.returncode != 0:
-                    self.finished.emit(False, f"git pull from {self.branch} failed: {res.stderr.strip()}")
-                    return
-            else:
-                # extracted directory update via zip archive strictly from platform branch
-                self.progress.emit(25, f"Downloading update archive for {self.branch}...")
-                archive_url = f"https://github.com/Yancovert/CorridorKey-Studio/archive/refs/heads/{self.branch}.zip"
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    zip_path = Path(tmp_dir) / "update.zip"
-                    urllib.request.urlretrieve(archive_url, zip_path)
+                try:
+                    self.progress.emit(25, f"Syncing latest commits from {self.branch}...")
+                    pull_cmd = [
+                        "git", "-C", str(self.app_root), "pull", "--no-rebase",
+                        "https://github.com/Yancovert/CorridorKey-Studio.git", self.branch
+                    ]
+                    res = subprocess.run(pull_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
+                    if res.returncode == 0:
+                        updated_via_git = True
+                    else:
+                        self.progress.emit(30, "Git sync conflict, switching to package update...")
+                except Exception:
+                    pass
 
-                    self.progress.emit(60, "Extracting updated source code...")
-                    with zipfile.ZipFile(zip_path, "r") as z:
-                        z.extractall(tmp_dir)
+            if not updated_via_git:
+                self._extract_zip_archive()
 
-                    extracted_dirs = [d for d in Path(tmp_dir).iterdir() if d.is_dir() and d.name.startswith("CorridorKey-Studio")]
-                    if not extracted_dirs:
-                        self.finished.emit(False, "Failed to locate extracted update directory.")
-                        return
-
-                    source_dir = extracted_dirs[0]
-                    self.progress.emit(80, "Applying code updates...")
-
-                    # copy core application directories and files
-                    sync_items = ["corridorkey", "gui", "scripts", "infer.py", "run_interactive.py", "launch_gui.sh", "launch_gui.bat", "requirements.txt"]
-                    for item in sync_items:
-                        src_item = source_dir / item
-                        dst_item = self.app_root / item
-                        if src_item.is_dir():
-                            shutil.copytree(src_item, dst_item, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-                        elif src_item.is_file():
-                            shutil.copy2(src_item, dst_item)
-
-            # update .build_version
-            self.progress.emit(95, "Finalizing update version metadata...")
+            self.progress.emit(95, "Updating version stamp...")
             version_file = self.app_root / ".build_version"
             version_content = f"branch={self.branch}\ncommit={self.remote_commit}\nversion=2.1.0\n"
             version_file.write_text(version_content, encoding="utf-8")
 
-            self.progress.emit(100, "Update complete!")
-            self.finished.emit(True, f"Successfully updated to {self.branch} ({self.remote_commit[:7]}).")
+            self.progress.emit(100, f"Successfully updated to {self.branch} ({self.remote_commit[:7]}).")
+            self.finished.emit(True, f"Updated to {self.branch} ({self.remote_commit[:7]}). Ready to restart.")
 
         except Exception as e:
-            self.finished.emit(False, f"Update failed: {str(e)}")
+            self.finished.emit(False, str(e))
