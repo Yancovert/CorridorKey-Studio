@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSlider, QCheckBox,
     QProgressBar, QTextEdit, QGroupBox, QSpinBox, QSplitter,
-    QFrame, QMessageBox, QDoubleSpinBox, QScrollArea, QLineEdit
+    QFrame, QMessageBox, QDoubleSpinBox, QScrollArea, QLineEdit,
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QApplication
 )
 
 from .gpu_info import (
@@ -26,6 +28,8 @@ from .settings_manager import load_settings, save_settings
 
 
 class MainWindow(QMainWindow):
+    BUFFER_NAMES = ["original", "cutout", "alpha", "fg", "checker"]
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CorridorKey Studio")
@@ -53,6 +57,11 @@ class MainWindow(QMainWindow):
         self.clip_frames: int = 100
         self.clip_fps: float = 24.0
 
+        # batch render queue state
+        self.queue_items: list[dict] = []
+        self._is_processing_queue: bool = False
+        self._queue_current_idx: int = 0
+
         # video playback engine state
         self.cap_orig: cv2.VideoCapture | None = None
         self.cap_cutout: cv2.VideoCapture | None = None
@@ -71,6 +80,7 @@ class MainWindow(QMainWindow):
         self._apply_gpu_defaults()
         self._load_saved_settings()
         self._check_for_updates()
+        self._check_patchnotes_on_launch()
 
     def _setup_theme(self):
         # register bundled nunito sans fonts
@@ -294,6 +304,9 @@ class MainWindow(QMainWindow):
         step_next = QShortcut(QKeySequence(Qt.Key.Key_Right), self)
         step_next.activated.connect(self._on_step_next)
 
+        swap_shortcut = QShortcut(QKeySequence(Qt.Key.Key_X), self)
+        swap_shortcut.activated.connect(self._on_toggle_swap_buffers)
+
     def _setup_ui(self):
         main_widget = QWidget()
         main_widget.setObjectName("centralWidget")
@@ -342,11 +355,25 @@ class MainWindow(QMainWindow):
         self.open_output_btn.clicked.connect(self._open_output_dir)
         header_bar.addWidget(self.open_output_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
 
+        self.btn_queue_toggle = QPushButton("Batch Queue (0)")
+        self.btn_queue_toggle.setFixedHeight(26)
+        self.btn_queue_toggle.setCheckable(True)
+        self.btn_queue_toggle.setChecked(False)
+        self.btn_queue_toggle.setToolTip("Toggle batch render queue panel")
+        self.btn_queue_toggle.clicked.connect(self._on_toggle_queue_drawer)
+        header_bar.addWidget(self.btn_queue_toggle, alignment=Qt.AlignmentFlag.AlignVCenter)
+
         self.settings_btn = QPushButton("Settings")
         self.settings_btn.setFixedHeight(26)
         self.settings_btn.setToolTip("Configure engine defaults, custom presets, and maintenance")
         self.settings_btn.clicked.connect(self._open_settings_dialog)
         header_bar.addWidget(self.settings_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        self.whats_new_btn = QPushButton("What's New")
+        self.whats_new_btn.setFixedHeight(26)
+        self.whats_new_btn.setToolTip("View recent update highlights and release notes")
+        self.whats_new_btn.clicked.connect(lambda: self._open_patchnotes_dialog())
+        header_bar.addWidget(self.whats_new_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         header_widget = QWidget()
         header_widget.setLayout(header_bar)
@@ -534,8 +561,21 @@ class MainWindow(QMainWindow):
         guidance_layout = QVBoxLayout(guidance_group)
         guidance_layout.setSpacing(6)
 
+        screen_row = QHBoxLayout()
+        lbl_screen = QLabel("Screen Color:")
+        lbl_screen.setStyleSheet("color: #9aa4b0; font-size: 11.5px; font-weight: 500;")
+        self.screen_color_combo = QComboBox()
+        self.screen_color_combo.addItems([
+            "Auto Detect",
+            "Green Screen",
+            "Blue Screen",
+        ])
+        screen_row.addWidget(lbl_screen)
+        screen_row.addWidget(self.screen_color_combo, stretch=1)
+        guidance_layout.addLayout(screen_row)
+
         mode_row = QHBoxLayout()
-        lbl_mode = QLabel("Mode:")
+        lbl_mode = QLabel("Guidance:")
         lbl_mode.setStyleSheet("color: #9aa4b0; font-size: 11.5px; font-weight: 500;")
         self.mode_combo = QComboBox()
         self.mode_combo.addItems([
@@ -558,6 +598,56 @@ class MainWindow(QMainWindow):
         self.hint_label.setStyleSheet("color: #7f8a96; font-size: 11px;")
         guidance_layout.addWidget(self.hint_label)
 
+        # alpha hint parameter controls
+        self.hint_controls_widget = QWidget()
+        hc_layout = QVBoxLayout(self.hint_controls_widget)
+        hc_layout.setContentsMargins(0, 0, 0, 0)
+        hc_layout.setSpacing(4)
+
+        ref_row = QHBoxLayout()
+        lbl_ref = QLabel("Ref Frame:")
+        lbl_ref.setStyleSheet("color: #9aa4b0; font-size: 11.5px; font-weight: 500;")
+        self.ref_frame_spin = QSpinBox()
+        self.ref_frame_spin.setRange(0, 50000)
+        self.ref_frame_spin.setValue(0)
+        self.btn_set_ref_frame = QPushButton("Set Current")
+        self.btn_set_ref_frame.setFixedHeight(22)
+        self.btn_set_ref_frame.setToolTip("Set active playhead position as hint reference frame")
+        self.btn_set_ref_frame.clicked.connect(self._set_current_as_ref_frame)
+        ref_row.addWidget(lbl_ref)
+        ref_row.addWidget(self.ref_frame_spin, stretch=1)
+        ref_row.addWidget(self.btn_set_ref_frame)
+        hc_layout.addLayout(ref_row)
+
+        self.hint_quality_slider = QSlider(Qt.Orientation.Horizontal)
+        self.hint_quality_slider.setRange(0, 100)
+        self.hint_quality_slider.setValue(75)
+        self.hint_quality_spin = QDoubleSpinBox()
+        self.hint_quality_spin.setRange(0.0, 1.0)
+        self.hint_quality_spin.setSingleStep(0.05)
+        self.hint_quality_spin.setValue(0.75)
+        self.hint_quality_spin.setFixedWidth(56)
+        self._sync_float_slider(self.hint_quality_slider, self.hint_quality_spin, 100.0)
+        hc_layout.addWidget(self._create_slider_param_row("Hint Strength:", self.hint_quality_slider, self.hint_quality_spin, ""))
+
+        self.carry_quality_slider = QSlider(Qt.Orientation.Horizontal)
+        self.carry_quality_slider.setRange(0, 100)
+        self.carry_quality_slider.setValue(95)
+        self.carry_quality_spin = QDoubleSpinBox()
+        self.carry_quality_spin.setRange(0.0, 1.0)
+        self.carry_quality_spin.setSingleStep(0.05)
+        self.carry_quality_spin.setValue(0.95)
+        self.carry_quality_spin.setFixedWidth(56)
+        self._sync_float_slider(self.carry_quality_slider, self.carry_quality_spin, 100.0)
+        hc_layout.addWidget(self._create_slider_param_row("Internal Memory:", self.carry_quality_slider, self.carry_quality_spin, ""))
+
+        self.carry_hint_check = QCheckBox("Propagate Memory Across Shots")
+        self.carry_hint_check.setChecked(True)
+        hc_layout.addWidget(self.carry_hint_check)
+
+        self.hint_controls_widget.setVisible(False)
+        guidance_layout.addWidget(self.hint_controls_widget)
+
         # despill slider + spinbox
         self.despill_slider = QSlider(Qt.Orientation.Horizontal)
         self.despill_slider.setRange(0, 100)
@@ -573,6 +663,97 @@ class MainWindow(QMainWindow):
         ))
 
         controls_layout.addWidget(guidance_group)
+
+        # post-processing and quality refinements (1:1 with CorridorKey Workbench 2.0)
+        quality_group = QGroupBox("Quality Refinements")
+        quality_layout = QVBoxLayout(quality_group)
+        quality_layout.setSpacing(6)
+
+        self.keep_solid_check = QCheckBox("Keep Original in Solid Core")
+        self.keep_solid_check.setToolTip("Preserves pristine camera textures in high-confidence core regions (alpha > 0.95)")
+        self.keep_solid_check.setChecked(False)
+        self.keep_solid_check.toggled.connect(self._on_toggle_keep_solid)
+        quality_layout.addWidget(self.keep_solid_check)
+
+        self.solid_options_widget = QWidget()
+        solid_options_layout = QVBoxLayout(self.solid_options_widget)
+        solid_options_layout.setContentsMargins(14, 0, 0, 0)
+        solid_options_layout.setSpacing(4)
+
+        erode_row = QHBoxLayout()
+        erode_lbl = QLabel("Erosion (px):")
+        erode_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.solid_erode_spin = QSpinBox()
+        self.solid_erode_spin.setRange(0, 32)
+        self.solid_erode_spin.setValue(4)
+        erode_row.addWidget(erode_lbl)
+        erode_row.addStretch()
+        erode_row.addWidget(self.solid_erode_spin)
+        solid_options_layout.addLayout(erode_row)
+
+        blur_row = QHBoxLayout()
+        blur_lbl = QLabel("Transition Blur (px):")
+        blur_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.solid_blur_spin = QSpinBox()
+        self.solid_blur_spin.setRange(0, 32)
+        self.solid_blur_spin.setValue(4)
+        blur_row.addWidget(blur_lbl)
+        blur_row.addStretch()
+        blur_row.addWidget(self.solid_blur_spin)
+        solid_options_layout.addLayout(blur_row)
+
+        self.solid_options_widget.setVisible(False)
+        quality_layout.addWidget(self.solid_options_widget)
+
+        self.despeckle_check = QCheckBox("Despeckle Noise Cleanup")
+        self.despeckle_check.setToolTip("Removes isolated floating sensor noise and green screen artifacts via connected components")
+        self.despeckle_check.setChecked(False)
+        self.despeckle_check.toggled.connect(self._on_toggle_despeckle)
+        quality_layout.addWidget(self.despeckle_check)
+
+        self.despeckle_options_widget = QWidget()
+        despeckle_options_layout = QVBoxLayout(self.despeckle_options_widget)
+        despeckle_options_layout.setContentsMargins(14, 0, 0, 0)
+        despeckle_options_layout.setSpacing(4)
+
+        thresh_row = QHBoxLayout()
+        thresh_lbl = QLabel("Min Area (px):")
+        thresh_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.despeckle_thresh_spin = QSpinBox()
+        self.despeckle_thresh_spin.setRange(10, 5000)
+        self.despeckle_thresh_spin.setSingleStep(25)
+        self.despeckle_thresh_spin.setValue(250)
+        thresh_row.addWidget(thresh_lbl)
+        thresh_row.addStretch()
+        thresh_row.addWidget(self.despeckle_thresh_spin)
+        despeckle_options_layout.addLayout(thresh_row)
+
+        dil_row = QHBoxLayout()
+        dil_lbl = QLabel("Dilation (px):")
+        dil_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.despeckle_dil_spin = QSpinBox()
+        self.despeckle_dil_spin.setRange(0, 16)
+        self.despeckle_dil_spin.setValue(4)
+        dil_row.addWidget(dil_lbl)
+        dil_row.addStretch()
+        dil_row.addWidget(self.despeckle_dil_spin)
+        despeckle_options_layout.addLayout(dil_row)
+
+        dblur_row = QHBoxLayout()
+        dblur_lbl = QLabel("Edge Blur (px):")
+        dblur_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.despeckle_blur_spin = QSpinBox()
+        self.despeckle_blur_spin.setRange(0, 16)
+        self.despeckle_blur_spin.setValue(4)
+        dblur_row.addWidget(dblur_lbl)
+        dblur_row.addStretch()
+        dblur_row.addWidget(self.despeckle_blur_spin)
+        despeckle_options_layout.addLayout(dblur_row)
+
+        self.despeckle_options_widget.setVisible(False)
+        quality_layout.addWidget(self.despeckle_options_widget)
+
+        controls_layout.addWidget(quality_group)
 
         # export deliverables
         export_group = QGroupBox("Output")
@@ -892,6 +1073,28 @@ class MainWindow(QMainWindow):
         self.start_btn.clicked.connect(self._start_keying)
         btn_layout.addWidget(self.start_btn, stretch=3)
 
+        self.add_queue_btn = QPushButton("+ Queue")
+        self.add_queue_btn.setFixedHeight(34)
+        self.add_queue_btn.setToolTip("Add current video and settings to Batch Queue")
+        self.add_queue_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #21252b;
+                color: #b0bac5;
+                font-weight: 600;
+                padding: 6px 10px;
+                border: 1px solid #333942;
+                border-radius: 4px;
+                font-size: 11.5px;
+            }
+            QPushButton:hover {
+                background-color: #2c323a;
+                border-color: #454d58;
+                color: #ffffff;
+            }
+        """)
+        self.add_queue_btn.clicked.connect(self._add_current_to_queue)
+        btn_layout.addWidget(self.add_queue_btn, stretch=1)
+
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setFixedHeight(34)
         self.cancel_btn.setEnabled(False)
@@ -936,45 +1139,105 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(10, 0, 0, 0)
         right_layout.setSpacing(6)
 
-        # view toolbar
+        # view comparison toolbar (1:1 with CorridorKey Workbench 2.0)
         view_bar = QHBoxLayout()
         view_bar.setContentsMargins(0, 0, 0, 0)
-        view_bar.setSpacing(8)
+        view_bar.setSpacing(6)
 
-        lbl_preview = QLabel("Preview:")
-        lbl_preview.setStyleSheet("font-size: 12px; font-weight: 600; color: #e6edf3;")
-        view_bar.addWidget(lbl_preview)
-        self.view_combo = QComboBox()
-        self.view_combo.addItems([
-            "Split View (Original vs Cutout)",
-            "Checkerboard Composite",
+        lbl_mode = QLabel("Mode:")
+        lbl_mode.setStyleSheet("font-size: 11px; font-weight: 600; color: #8b949e;")
+        view_bar.addWidget(lbl_mode)
+
+        self.view_mode_combo = QComboBox()
+        self.view_mode_combo.addItems([
+            "Vertical Wipe",
+            "Horizontal Wipe",
+            "Difference Blend",
+            "Overlay Crossfade",
+            "Single View",
+        ])
+        self.view_mode_combo.currentIndexChanged.connect(self._on_comparison_mode_changed)
+        view_bar.addWidget(self.view_mode_combo)
+
+        lbl_buf_a = QLabel("A:")
+        lbl_buf_a.setStyleSheet("font-size: 11.5px; font-weight: 700; color: #3b82f6;")
+        view_bar.addWidget(lbl_buf_a)
+
+        self.buf_a_combo = QComboBox()
+        self.buf_a_combo.addItems([
+            "Original Footage",
+            "Cutout (RGBA)",
             "Alpha Matte",
             "Despilled RGB",
-            "Original Footage",
+            "Checkerboard Composite",
         ])
-        self.view_combo.currentIndexChanged.connect(self._on_view_mode_changed)
-        view_bar.addWidget(self.view_combo)
+        self.buf_a_combo.setCurrentIndex(0)
+        self.buf_a_combo.currentIndexChanged.connect(self._on_buffer_a_changed)
+        view_bar.addWidget(self.buf_a_combo)
+
+        self.btn_swap_buffers = QPushButton("⇄")
+        self.btn_swap_buffers.setToolTip("Swap Buffer A and Buffer B (Shortcut: X)")
+        self.btn_swap_buffers.setFixedSize(26, 24)
+        self.btn_swap_buffers.setStyleSheet(
+            "QPushButton { background-color: #21252b; border: 1px solid #333942; border-radius: 4px; font-size: 13px; font-weight: bold; color: #b6c2cf; padding: 0px; } "
+            "QPushButton:hover { background-color: #2c323a; color: #ffffff; border-color: #3b82f6; }"
+        )
+        self.btn_swap_buffers.clicked.connect(self._on_toggle_swap_buffers)
+        view_bar.addWidget(self.btn_swap_buffers)
+
+        lbl_buf_b = QLabel("B:")
+        lbl_buf_b.setStyleSheet("font-size: 11.5px; font-weight: 700; color: #10b981;")
+        view_bar.addWidget(lbl_buf_b)
+
+        self.buf_b_combo = QComboBox()
+        self.buf_b_combo.addItems([
+            "Original Footage",
+            "Cutout (RGBA)",
+            "Alpha Matte",
+            "Despilled RGB",
+            "Checkerboard Composite",
+        ])
+        self.buf_b_combo.setCurrentIndex(1)
+        self.buf_b_combo.currentIndexChanged.connect(self._on_buffer_b_changed)
+        view_bar.addWidget(self.buf_b_combo)
+
+        # overlay opacity slider (visible when Overlay Crossfade is chosen)
+        self.overlay_slider_widget = QWidget()
+        overlay_layout = QHBoxLayout(self.overlay_slider_widget)
+        overlay_layout.setContentsMargins(4, 0, 0, 0)
+        overlay_layout.setSpacing(4)
+        lbl_op = QLabel("Opacity:")
+        lbl_op.setStyleSheet("color: #7f8a96; font-size: 11px;")
+        overlay_layout.addWidget(lbl_op)
+        self.overlay_opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.overlay_opacity_slider.setRange(0, 100)
+        self.overlay_opacity_slider.setValue(50)
+        self.overlay_opacity_slider.setFixedWidth(70)
+        self.overlay_opacity_slider.valueChanged.connect(lambda val: self.canvas.set_overlay_opacity(val / 100.0))
+        overlay_layout.addWidget(self.overlay_opacity_slider)
+        self.overlay_slider_widget.setVisible(False)
+        view_bar.addWidget(self.overlay_slider_widget)
 
         # zoom presets
         view_bar.addSpacing(6)
         lbl_zoom = QLabel("Zoom:")
-        lbl_zoom.setStyleSheet("font-size: 12px; font-weight: 600; color: #e6edf3;")
+        lbl_zoom.setStyleSheet("font-size: 11px; font-weight: 600; color: #8b949e;")
         view_bar.addWidget(lbl_zoom)
         btn_zoom_fit = QPushButton("Fit")
-        btn_zoom_fit.setFixedHeight(28)
-        btn_zoom_fit.setMinimumWidth(44)
+        btn_zoom_fit.setFixedHeight(26)
+        btn_zoom_fit.setMinimumWidth(38)
         btn_zoom_fit.clicked.connect(lambda: self.canvas.set_zoom_mode("fit"))
         view_bar.addWidget(btn_zoom_fit)
 
         btn_zoom_100 = QPushButton("100%")
-        btn_zoom_100.setFixedHeight(28)
-        btn_zoom_100.setMinimumWidth(52)
+        btn_zoom_100.setFixedHeight(26)
+        btn_zoom_100.setMinimumWidth(46)
         btn_zoom_100.clicked.connect(lambda: self.canvas.set_zoom_mode("100%"))
         view_bar.addWidget(btn_zoom_100)
 
         btn_zoom_200 = QPushButton("200%")
-        btn_zoom_200.setFixedHeight(28)
-        btn_zoom_200.setMinimumWidth(52)
+        btn_zoom_200.setFixedHeight(26)
+        btn_zoom_200.setMinimumWidth(46)
         btn_zoom_200.clicked.connect(lambda: self.canvas.set_zoom_mode("200%"))
         view_bar.addWidget(btn_zoom_200)
 
@@ -1065,6 +1328,100 @@ class MainWindow(QMainWindow):
 
         pb_layout.addLayout(transport_layout)
         right_layout.addWidget(playback_frame)
+
+        # batch render queue drawer
+        self.queue_container = QWidget()
+        self.queue_container.setVisible(False)
+        self.queue_container.setStyleSheet(
+            "QWidget#queueContainer { background-color: #21252b; border: 1px solid #2e343d; border-radius: 5px; }"
+        )
+        self.queue_container.setObjectName("queueContainer")
+        qc_layout = QVBoxLayout(self.queue_container)
+        qc_layout.setContentsMargins(8, 6, 8, 8)
+        qc_layout.setSpacing(6)
+
+        q_hdr = QHBoxLayout()
+        q_hdr.setSpacing(8)
+        lbl_q_title = QLabel("Batch Render Queue")
+        lbl_q_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #f0f6fc;")
+        q_hdr.addWidget(lbl_q_title)
+
+        self.lbl_queue_count = QLabel("0 items")
+        self.lbl_queue_count.setStyleSheet("color: #7f8a96; font-size: 11px;")
+        q_hdr.addWidget(self.lbl_queue_count)
+
+        q_hdr.addStretch()
+
+        btn_q_add = QPushButton("+ Add Videos...")
+        btn_q_add.setFixedHeight(24)
+        btn_q_add.clicked.connect(self._browse_add_queue_files)
+        q_hdr.addWidget(btn_q_add)
+
+        btn_q_remove = QPushButton("Remove")
+        btn_q_remove.setFixedHeight(24)
+        btn_q_remove.clicked.connect(self._remove_selected_queue_item)
+        q_hdr.addWidget(btn_q_remove)
+
+        btn_q_clear = QPushButton("Clear")
+        btn_q_clear.setFixedHeight(24)
+        btn_q_clear.clicked.connect(self._clear_queue)
+        q_hdr.addWidget(btn_q_clear)
+
+        self.btn_q_render = QPushButton("Render Queue")
+        self.btn_q_render.setFixedHeight(24)
+        self.btn_q_render.setStyleSheet(
+            "QPushButton { background-color: #2b5580; color: #ffffff; font-weight: 600; padding: 2px 10px; border: 1px solid #386ca3; border-radius: 4px; font-size: 11px; } "
+            "QPushButton:hover { background-color: #336699; } "
+            "QPushButton:disabled { background-color: #1a1d21; color: #4e555e; border-color: #282d34; }"
+        )
+        self.btn_q_render.clicked.connect(self._start_batch_queue)
+        q_hdr.addWidget(self.btn_q_render)
+
+        qc_layout.addLayout(q_hdr)
+
+        self.queue_table = QTableWidget(0, 5)
+        self.queue_table.setHorizontalHeaderLabels(["Input File", "Resolution", "Frames", "Format", "Status"])
+        self.queue_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.queue_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.queue_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.queue_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.queue_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.queue_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.queue_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.queue_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.queue_table.setFixedHeight(120)
+        self.queue_table.verticalHeader().setVisible(False)
+        self.queue_table.setStyleSheet("""
+            QTableWidget {
+                background-color: #171a1e;
+                border: 1px solid #2e343d;
+                border-radius: 4px;
+                color: #e6eaef;
+                font-size: 11px;
+                gridline-color: transparent;
+            }
+            QTableWidget::item {
+                padding: 3px 6px;
+                border-bottom: 1px solid #21252b;
+            }
+            QTableWidget::item:selected {
+                background-color: #244166;
+                color: #ffffff;
+            }
+            QHeaderView::section {
+                background-color: #1f2329;
+                color: #8b949e;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 4px;
+                border: none;
+                border-bottom: 1px solid #2e343d;
+            }
+        """)
+        self.queue_table.cellDoubleClicked.connect(self._on_queue_table_double_clicked)
+        qc_layout.addWidget(self.queue_table)
+
+        right_layout.addWidget(self.queue_container)
 
         # inline progress bar (visible only during render)
         self.progress_bar = QProgressBar()
@@ -1194,6 +1551,23 @@ class MainWindow(QMainWindow):
         self.swin_batch_spin.setValue(self.gpu_profile.recommended_swin_batch)
         self.threads_spin.setValue(self.gpu_profile.recommended_ffmpeg_threads)
         self.ffmpeg_preset_combo.setCurrentText("medium")
+        if hasattr(self, "screen_color_combo"):
+            self.screen_color_combo.setCurrentIndex(0)
+        if hasattr(self, "keep_solid_check"):
+            self.keep_solid_check.setChecked(False)
+            self.solid_erode_spin.setValue(4)
+            self.solid_blur_spin.setValue(4)
+        if hasattr(self, "despeckle_check"):
+            self.despeckle_check.setChecked(False)
+            self.despeckle_thresh_spin.setValue(250)
+            self.despeckle_dil_spin.setValue(4)
+            self.despeckle_blur_spin.setValue(4)
+        if hasattr(self, "hint_quality_spin"):
+            self.hint_quality_spin.setValue(0.75)
+        if hasattr(self, "carry_quality_spin"):
+            self.carry_quality_spin.setValue(0.95)
+        if hasattr(self, "carry_hint_check"):
+            self.carry_hint_check.setChecked(True)
         self._update_vram_budget()
 
     def _load_saved_settings(self):
@@ -1227,6 +1601,36 @@ class MainWindow(QMainWindow):
             self.linear_check.setChecked(bool(data["linear"]))
         if "despill" in data:
             self.despill_spin.setValue(float(data["despill"]))
+        if "screen_color" in data and hasattr(self, "screen_color_combo"):
+            sc = data["screen_color"]
+            if isinstance(sc, int):
+                self.screen_color_combo.setCurrentIndex(max(0, min(2, sc)))
+            elif str(sc).lower() in ("auto", "0"):
+                self.screen_color_combo.setCurrentIndex(0)
+            elif str(sc).lower() in ("green", "1"):
+                self.screen_color_combo.setCurrentIndex(1)
+            elif str(sc).lower() in ("blue", "2"):
+                self.screen_color_combo.setCurrentIndex(2)
+        if "keep_solid" in data and hasattr(self, "keep_solid_check"):
+            self.keep_solid_check.setChecked(bool(data["keep_solid"]))
+        if "solid_erode_px" in data and hasattr(self, "solid_erode_spin"):
+            self.solid_erode_spin.setValue(int(data["solid_erode_px"]))
+        if "solid_blur_px" in data and hasattr(self, "solid_blur_spin"):
+            self.solid_blur_spin.setValue(int(data["solid_blur_px"]))
+        if "despeckle" in data and hasattr(self, "despeckle_check"):
+            self.despeckle_check.setChecked(bool(data["despeckle"]))
+        if "despeckle_threshold" in data and hasattr(self, "despeckle_thresh_spin"):
+            self.despeckle_thresh_spin.setValue(int(data["despeckle_threshold"]))
+        if "despeckle_dilation" in data and hasattr(self, "despeckle_dil_spin"):
+            self.despeckle_dil_spin.setValue(int(data["despeckle_dilation"]))
+        if "despeckle_blur" in data and hasattr(self, "despeckle_blur_spin"):
+            self.despeckle_blur_spin.setValue(int(data["despeckle_blur"]))
+        if "hint_quality" in data and hasattr(self, "hint_quality_spin"):
+            self.hint_quality_spin.setValue(float(data["hint_quality"]))
+        if "carry_quality" in data and hasattr(self, "carry_quality_spin"):
+            self.carry_quality_spin.setValue(float(data["carry_quality"]))
+        if "carry_hint" in data and hasattr(self, "carry_hint_check"):
+            self.carry_hint_check.setChecked(bool(data["carry_hint"]))
         if "contrast" in data:
             self.contrast_spin.setValue(float(data["contrast"]))
         if "bright" in data:
@@ -1274,6 +1678,17 @@ class MainWindow(QMainWindow):
             "threads": self.threads_spin.value(),
             "linear": self.linear_check.isChecked(),
             "despill": round(self.despill_spin.value(), 2),
+            "screen_color": self.screen_color_combo.currentIndex() if hasattr(self, "screen_color_combo") else 0,
+            "keep_solid": self.keep_solid_check.isChecked() if hasattr(self, "keep_solid_check") else False,
+            "solid_erode_px": self.solid_erode_spin.value() if hasattr(self, "solid_erode_spin") else 4,
+            "solid_blur_px": self.solid_blur_spin.value() if hasattr(self, "solid_blur_spin") else 4,
+            "despeckle": self.despeckle_check.isChecked() if hasattr(self, "despeckle_check") else False,
+            "despeckle_threshold": self.despeckle_thresh_spin.value() if hasattr(self, "despeckle_thresh_spin") else 250,
+            "despeckle_dilation": self.despeckle_dil_spin.value() if hasattr(self, "despeckle_dil_spin") else 4,
+            "despeckle_blur": self.despeckle_blur_spin.value() if hasattr(self, "despeckle_blur_spin") else 4,
+            "hint_quality": round(self.hint_quality_spin.value(), 2) if hasattr(self, "hint_quality_spin") else 0.75,
+            "carry_quality": round(self.carry_quality_spin.value(), 2) if hasattr(self, "carry_quality_spin") else 0.95,
+            "carry_hint": self.carry_hint_check.isChecked() if hasattr(self, "carry_hint_check") else True,
             "contrast": round(self.contrast_spin.value(), 2),
             "bright": round(self.bright_spin.value(), 2),
             "deliverable": self.deliverable_combo.currentText(),
@@ -1294,6 +1709,29 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self, self.gpu_profile, self.app_root, current_data, system_gpus=self.system_gpus)
         dlg.settings_applied.connect(self._apply_settings_dict)
         dlg.exec()
+
+    def _open_patchnotes_dialog(self, since_version: str | None = None):
+        from .patchnotes_dialog import PatchNotesDialog, get_installed_version
+        current_version = get_installed_version(self.app_root)
+        dlg = PatchNotesDialog(self, self.app_root, since_version=since_version, current_version=current_version)
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            dlg.show()
+        else:
+            dlg.exec()
+        saved = load_settings()
+        if saved.get("last_seen_version") != current_version:
+            saved["last_seen_version"] = current_version
+            save_settings(saved)
+
+    def _check_patchnotes_on_launch(self):
+        from .patchnotes_dialog import get_installed_version, parse_semver
+        saved = load_settings()
+        last_seen = saved.get("last_seen_version")
+        current_version = get_installed_version(self.app_root)
+        if last_seen is None or parse_semver(last_seen) < parse_semver(current_version):
+            # open catchup dialog after UI initializes
+            QTimer.singleShot(400, lambda: self._open_patchnotes_dialog(since_version=last_seen))
+
 
     def _on_toggle_advanced(self, checked: bool):
         self.advanced_container.setVisible(checked)
@@ -1367,7 +1805,18 @@ class MainWindow(QMainWindow):
                 self.foundation_chunk_spin.setValue(4)
                 self.swin_batch_spin.setValue(16)
             self.ffmpeg_preset_combo.setCurrentText("slow")
+            if hasattr(self, "keep_solid_check"):
+                self.keep_solid_check.setChecked(True)
+                self.solid_erode_spin.setValue(4)
+                self.solid_blur_spin.setValue(4)
+            if hasattr(self, "despeckle_check"):
+                self.despeckle_check.setChecked(True)
+                self.despeckle_thresh_spin.setValue(250)
         elif index == 2:  # High-Performance Workstation (24GB+ / Multi-Batch)
+            if hasattr(self, "keep_solid_check"):
+                self.keep_solid_check.setChecked(False)
+            if hasattr(self, "despeckle_check"):
+                self.despeckle_check.setChecked(False)
             self.scale_spin.setValue(1.0)
             self.chunk_spin.setValue(80)
             self.stride_spin.setValue(40)
@@ -1378,6 +1827,10 @@ class MainWindow(QMainWindow):
             self.threads_spin.setValue(min(12, max(4, (os.cpu_count() or 4) // 2)))
             self.ffmpeg_preset_combo.setCurrentText("medium")
         elif index == 3:  # Fast Turnaround (Speed & Quick Preview)
+            if hasattr(self, "keep_solid_check"):
+                self.keep_solid_check.setChecked(False)
+            if hasattr(self, "despeckle_check"):
+                self.despeckle_check.setChecked(False)
             self.scale_spin.setValue(1.0)
             if self.gpu_profile.total_vram_gb >= 11.5:
                 self.chunk_spin.setValue(48)
@@ -1402,6 +1855,10 @@ class MainWindow(QMainWindow):
                 self.swin_batch_spin.setValue(16)
             self.ffmpeg_preset_combo.setCurrentText("fast")
         elif index == 4:  # Low-VRAM Compatibility (4GB - 6GB Staged)
+            if hasattr(self, "keep_solid_check"):
+                self.keep_solid_check.setChecked(False)
+            if hasattr(self, "despeckle_check"):
+                self.despeckle_check.setChecked(False)
             self.scale_spin.setValue(1.0)
             self.chunk_spin.setValue(8)
             self.stride_spin.setValue(4)
@@ -1431,8 +1888,15 @@ class MainWindow(QMainWindow):
         avail = self.gpu_profile.total_vram_gb
         is_safe = (avail == 0) or (peak_est <= avail)
 
+        short_gpu = self.gpu_profile.short_name
+        vram_text = f"{avail:.1f} GB" if self.gpu_profile.is_cuda_available else "N/A"
+        if self.gpu_profile.is_cuda_available and self.selected_input is not None:
+            self.gpu_badge.setText(f"{short_gpu} ({vram_text}) · Fits in VRAM: ~{peak_est:.1f} GB")
+        else:
+            self.gpu_badge.setText(f"{short_gpu} ({vram_text})")
+
         if self.selected_input is not None and not is_safe and not self.low_vram_check.isChecked():
-            self.vram_warning.setText(f"Warning: High VRAM load (~{peak_est} GB / {avail} GB). Low-VRAM mode recommended.")
+            self.vram_warning.setText(f"Warning: High VRAM load (~{peak_est:.1f} GB / {avail:.1f} GB). Low-VRAM mode recommended.")
             self.vram_warning.setVisible(True)
         else:
             self.vram_warning.setVisible(False)
@@ -1452,9 +1916,14 @@ class MainWindow(QMainWindow):
     def dropEvent(self, event: QDropEvent):
         urls = event.mimeData().urls()
         if urls:
-            path = urls[0].toLocalFile()
-            if path:
-                self._set_input_path(path)
+            paths = [u.toLocalFile() for u in urls if u.toLocalFile()]
+            if len(paths) == 1:
+                self._set_input_path(paths[0])
+            elif len(paths) > 1:
+                for p in paths:
+                    self._add_to_queue(p)
+                self._set_input_path(paths[0])
+                self._on_toggle_queue_drawer(True)
 
     def _set_input_path(self, path: str):
         self.selected_input = path
@@ -1686,14 +2155,254 @@ class MainWindow(QMainWindow):
         has_hint = index > 0
         self.hint_btn.setVisible(has_hint)
         self.hint_label.setVisible(has_hint)
+        if hasattr(self, "hint_controls_widget"):
+            self.hint_controls_widget.setVisible(has_hint)
         if index == 1:
             self.hint_btn.setText("Select First-Frame Mask...")
         elif index == 2:
             self.hint_btn.setText("Select Mask Video...")
 
     def _on_view_mode_changed(self, index: int):
-        modes = ["split", "checker", "alpha", "fg", "original"]
-        self.canvas.set_view_mode(modes[index])
+        modes = ["split_v", "checker", "alpha", "fg", "original"]
+        if 0 <= index < len(modes):
+            self.canvas.set_view_mode(modes[index])
+
+    def _on_comparison_mode_changed(self, index: int):
+        modes = ["split_v", "split_h", "difference", "overlay", "single"]
+        mode = modes[index] if 0 <= index < len(modes) else "split_v"
+        self.canvas.set_view_mode(mode)
+        if hasattr(self, "overlay_slider_widget"):
+            self.overlay_slider_widget.setVisible(mode == "overlay")
+
+    def _on_buffer_a_changed(self, index: int):
+        if 0 <= index < len(self.BUFFER_NAMES):
+            self.canvas.set_buffer_a(self.BUFFER_NAMES[index])
+
+    def _on_buffer_b_changed(self, index: int):
+        if 0 <= index < len(self.BUFFER_NAMES):
+            self.canvas.set_buffer_b(self.BUFFER_NAMES[index])
+
+    def _on_toggle_swap_buffers(self):
+        self.canvas.toggle_swap()
+        is_swapped = self.canvas.is_swapped()
+        self.btn_swap_buffers.setStyleSheet(
+            "QPushButton { background-color: #2b5580; border: 1px solid #3b82f6; border-radius: 4px; font-size: 13px; font-weight: bold; color: #ffffff; padding: 0px; }"
+            if is_swapped else
+            "QPushButton { background-color: #21252b; border: 1px solid #333942; border-radius: 4px; font-size: 13px; font-weight: bold; color: #b6c2cf; padding: 0px; } "
+            "QPushButton:hover { background-color: #2c323a; color: #ffffff; border-color: #3b82f6; }"
+        )
+        self.status_label.setText("Buffer A ⇄ B Swapped" if is_swapped else "Buffer A ⇄ B Normal")
+
+    def _on_toggle_keep_solid(self, checked: bool):
+        if hasattr(self, "solid_options_widget"):
+            self.solid_options_widget.setVisible(checked)
+
+    def _on_toggle_despeckle(self, checked: bool):
+        if hasattr(self, "despeckle_options_widget"):
+            self.despeckle_options_widget.setVisible(checked)
+
+    def _set_current_as_ref_frame(self):
+        if hasattr(self, "ref_frame_spin"):
+            self.ref_frame_spin.setValue(self.current_frame_idx)
+            self.status_label.setText(f"Reference frame set to frame {self.current_frame_idx}")
+
+    def _on_toggle_queue_drawer(self, checked: bool | None = None):
+        if checked is None or isinstance(checked, int):
+            new_state = not self.queue_container.isVisible()
+        else:
+            new_state = bool(checked)
+        self.queue_container.setVisible(new_state)
+        self.btn_queue_toggle.setChecked(new_state)
+
+    def _add_to_queue(self, file_path: str):
+        p = Path(file_path)
+        if not p.is_file():
+            return
+        cap = cv2.VideoCapture(str(p))
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 0
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 0
+        frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+        cap.release()
+
+        formats = [
+            "prores4444",
+            "png_sequence",
+            "webm_vp9",
+            "qtrle",
+            "tiff_sequence",
+            "resolve_pack",
+            "openexr_sequence",
+            "standard_passes",
+        ]
+        chosen_fmt = formats[self.deliverable_combo.currentIndex()]
+
+        item = {
+            "path": str(p),
+            "name": p.name,
+            "res": f"{w}x{h}" if w and h else "Unknown",
+            "frames": frames,
+            "format": chosen_fmt,
+            "status": "Ready",
+        }
+        self.queue_items.append(item)
+
+        row = self.queue_table.rowCount()
+        self.queue_table.insertRow(row)
+        self.queue_table.setItem(row, 0, QTableWidgetItem(p.name))
+        self.queue_table.setItem(row, 1, QTableWidgetItem(item["res"]))
+        self.queue_table.setItem(row, 2, QTableWidgetItem(str(frames)))
+        self.queue_table.setItem(row, 3, QTableWidgetItem(self.deliverable_combo.currentText().split()[0]))
+        st_item = QTableWidgetItem("Ready")
+        st_item.setForeground(QColor("#7f8a96"))
+        self.queue_table.setItem(row, 4, st_item)
+
+        count = len(self.queue_items)
+        self.lbl_queue_count.setText(f"{count} items")
+        self.btn_queue_toggle.setText(f"Batch Queue ({count})")
+
+    def _add_current_to_queue(self):
+        if not self.selected_input or not Path(self.selected_input).exists():
+            QMessageBox.warning(self, "No Video Loaded", "Please select an input video first.")
+            return
+        self._add_to_queue(self.selected_input)
+        self._on_toggle_queue_drawer(True)
+
+    def _browse_add_queue_files(self):
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "Select Video Files to Queue", "",
+            "Video Files (*.mp4 *.mov *.avi *.mkv *.webm);;All Files (*)"
+        )
+        if files:
+            for f in files:
+                self._add_to_queue(f)
+            self._on_toggle_queue_drawer(True)
+
+    def _remove_selected_queue_item(self):
+        if self._is_processing_queue:
+            return
+        row = self.queue_table.currentRow()
+        if 0 <= row < len(self.queue_items):
+            self.queue_items.pop(row)
+            self.queue_table.removeRow(row)
+            count = len(self.queue_items)
+            self.lbl_queue_count.setText(f"{count} items")
+            self.btn_queue_toggle.setText(f"Batch Queue ({count})")
+
+    def _clear_queue(self):
+        if self._is_processing_queue:
+            return
+        self.queue_items.clear()
+        self.queue_table.setRowCount(0)
+        self.lbl_queue_count.setText("0 items")
+        self.btn_queue_toggle.setText("Batch Queue (0)")
+
+    def _on_queue_table_double_clicked(self, row: int, col: int):
+        if 0 <= row < len(self.queue_items):
+            self._set_input_path(self.queue_items[row]["path"])
+
+    def _start_batch_queue(self):
+        if not self.queue_items:
+            QMessageBox.information(self, "Queue Empty", "No video files in the batch queue.")
+            return
+
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, "Busy", "Inference is already running.")
+            return
+
+        first_ready = next((i for i, it in enumerate(self.queue_items) if it["status"] == "Ready"), None)
+        if first_ready is None:
+            for i, it in enumerate(self.queue_items):
+                it["status"] = "Ready"
+                st = self.queue_table.item(i, 4)
+                if st:
+                    st.setText("Ready")
+                    st.setForeground(QColor("#7f8a96"))
+            first_ready = 0
+
+        self._is_processing_queue = True
+        self._queue_current_idx = first_ready
+        self.btn_q_render.setEnabled(False)
+        self.start_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(True)
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self._process_queue_item(first_ready)
+
+    def _process_queue_item(self, idx: int):
+        item = self.queue_items[idx]
+        item["status"] = "Processing"
+        st = self.queue_table.item(idx, 4)
+        if st:
+            st.setText("Processing")
+            st.setForeground(QColor("#3b82f6"))
+
+        self.selected_input = item["path"]
+        self._set_input_path(item["path"])
+
+        total_q = len(self.queue_items)
+        self.status_label.setText(f"Queue [{idx + 1}/{total_q}]: Processing {item['name']}...")
+        self.log_text.append(f"\n--- Batch Queue [{idx + 1}/{total_q}]: {item['name']} ---")
+
+        self._launch_worker_for_path(item["path"], item.get("format", "prores4444"))
+
+    def _launch_worker_for_path(self, input_path: str, chosen_format: str):
+        gpu_data = self.gpu_combo.currentData() or {}
+        cuda_idx = gpu_data.get("cuda_idx")
+
+        color_map = {0: "auto", 1: "green", 2: "blue"}
+        chosen_color = color_map.get(self.screen_color_combo.currentIndex() if hasattr(self, "screen_color_combo") else 0, "auto")
+
+        repo_root = Path(__file__).resolve().parents[1]
+        self.worker = KeyerEngineWorker(
+            repo_root=repo_root,
+            input_path=input_path,
+            output_dir=self.output_dir,
+            mode=self.mode_combo.currentText(),
+            hint_path=self.hint_path,
+            despill=self.despill_spin.value(),
+            deliverable_format=chosen_format,
+            generate_blender_script=self.blender_script_check.isChecked(),
+            num_frames=self.num_frames_spin.value(),
+            start_mode=self.start_mode_combo.currentText().split()[0],
+            seed=self.seed_spin.value(),
+            scale=self.scale_spin.value(),
+            hann_chunk=self.chunk_spin.value(),
+            hann_stride=self.stride_spin.value(),
+            hint_quality=self.hint_quality_spin.value(),
+            carry_quality=self.carry_quality_spin.value(),
+            carry_hint=self.carry_hint_check.isChecked() if hasattr(self, "carry_hint_check") else True,
+            linear=self.linear_check.isChecked(),
+            linear_contrast=self.contrast_spin.value(),
+            linear_brightness=self.bright_spin.value(),
+            contrast_pivot=self.contrast_pivot_spin.value(),
+            low_vram=self.low_vram_check.isChecked(),
+            stage2_batch=self.stage2_batch_spin.value(),
+            foundation_chunk=self.foundation_chunk_spin.value(),
+            swin_batch=self.swin_batch_spin.value(),
+            ffmpeg_codec=self.ffmpeg_codec_combo.currentText(),
+            preset=self.ffmpeg_preset_combo.currentText(),
+            crf=self.crf_spin.value(),
+            ffmpeg_threads=self.threads_spin.value(),
+            mlp_chunk=self.mlp_chunk_spin.value(),
+            attn_chunk=self.attn_chunk_spin.value(),
+            frame_dir_fps=self.frame_dir_fps_spin.value(),
+            frame_dir_linear=self.frame_dir_linear_check.isChecked(),
+            temp_dir=self.temp_dir_edit.text() if self.temp_dir_edit.text() else None,
+            cuda_device_index=cuda_idx,
+            screen_color=chosen_color,
+            keep_solid=self.keep_solid_check.isChecked() if hasattr(self, "keep_solid_check") else False,
+            solid_erode_px=self.solid_erode_spin.value() if hasattr(self, "solid_erode_spin") else 4,
+            solid_blur_px=self.solid_blur_spin.value() if hasattr(self, "solid_blur_spin") else 4,
+            despeckle=self.despeckle_check.isChecked() if hasattr(self, "despeckle_check") else False,
+            despeckle_threshold=self.despeckle_thresh_spin.value() if hasattr(self, "despeckle_thresh_spin") else 250,
+            despeckle_dilation=self.despeckle_dil_spin.value() if hasattr(self, "despeckle_dil_spin") else 4,
+            despeckle_blur=self.despeckle_blur_spin.value() if hasattr(self, "despeckle_blur_spin") else 4,
+        )
+
+        self.worker.progress_update.connect(self._on_progress)
+        self.worker.log_output.connect(self._on_log)
+        self.worker.finished.connect(self._on_finished)
+        self.worker.start()
 
     def _start_keying(self):
         if not self.selected_input or not Path(self.selected_input).exists():
@@ -1723,7 +2432,6 @@ class MainWindow(QMainWindow):
         gpu_data = self.gpu_combo.currentData() or {}
         is_compat = gpu_data.get("compat", True)
         dev_id = gpu_data.get("id", "auto")
-        cuda_idx = gpu_data.get("cuda_idx")
 
         if not is_compat:
             box = QMessageBox(self)
@@ -1766,7 +2474,6 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Starting CorridorKey inference...")
         self.log_text.clear()
 
-        # open log area so user sees real-time progress
         if not self.btn_toggle_log.isChecked():
             self.btn_toggle_log.setChecked(True)
         self.log_container.setVisible(True)
@@ -1784,51 +2491,19 @@ class MainWindow(QMainWindow):
             "standard_passes",
         ]
         chosen_format = formats[self.deliverable_combo.currentIndex()]
-
-        repo_root = Path(__file__).resolve().parents[1]
-        self.worker = KeyerEngineWorker(
-            repo_root=repo_root,
-            input_path=self.selected_input,
-            output_dir=self.output_dir,
-            mode=self.mode_combo.currentText(),
-            hint_path=self.hint_path,
-            despill=self.despill_spin.value(),
-            deliverable_format=chosen_format,
-            generate_blender_script=self.blender_script_check.isChecked(),
-            num_frames=self.num_frames_spin.value(),
-            start_mode=self.start_mode_combo.currentText().split()[0],
-            seed=self.seed_spin.value(),
-            scale=self.scale_spin.value(),
-            hann_chunk=self.chunk_spin.value(),
-            hann_stride=self.stride_spin.value(),
-            hint_quality=self.hint_quality_spin.value(),
-            carry_quality=self.carry_quality_spin.value(),
-            linear=self.linear_check.isChecked(),
-            linear_contrast=self.contrast_spin.value(),
-            linear_brightness=self.bright_spin.value(),
-            contrast_pivot=self.contrast_pivot_spin.value(),
-            low_vram=self.low_vram_check.isChecked(),
-            stage2_batch=self.stage2_batch_spin.value(),
-            foundation_chunk=self.foundation_chunk_spin.value(),
-            swin_batch=self.swin_batch_spin.value(),
-            ffmpeg_codec=self.ffmpeg_codec_combo.currentText(),
-            preset=self.ffmpeg_preset_combo.currentText(),
-            crf=self.crf_spin.value(),
-            ffmpeg_threads=self.threads_spin.value(),
-            mlp_chunk=self.mlp_chunk_spin.value(),
-            attn_chunk=self.attn_chunk_spin.value(),
-            frame_dir_fps=self.frame_dir_fps_spin.value(),
-            frame_dir_linear=self.frame_dir_linear_check.isChecked(),
-            temp_dir=self.temp_dir_edit.text() if self.temp_dir_edit.text() else None,
-            cuda_device_index=cuda_idx,
-        )
-
-        self.worker.progress_update.connect(self._on_progress)
-        self.worker.log_output.connect(self._on_log)
-        self.worker.finished.connect(self._on_finished)
-        self.worker.start()
+        self._launch_worker_for_path(self.selected_input, chosen_format)
 
     def _cancel_keying(self):
+        if self._is_processing_queue:
+            self._is_processing_queue = False
+            self.btn_q_render.setEnabled(True)
+            if 0 <= self._queue_current_idx < len(self.queue_items):
+                self.queue_items[self._queue_current_idx]["status"] = "Cancelled"
+                st = self.queue_table.item(self._queue_current_idx, 4)
+                if st:
+                    st.setText("Cancelled")
+                    st.setForeground(QColor("#e5b642"))
+
         if self.worker and self.worker.isRunning():
             self.status_label.setText("Cancelling inference...")
             self.cancel_btn.setEnabled(False)
@@ -1854,6 +2529,37 @@ class MainWindow(QMainWindow):
 
     @Slot(bool, str, dict)
     def _on_finished(self, success: bool, message: str, outputs: dict):
+        if self._is_processing_queue and 0 <= self._queue_current_idx < len(self.queue_items):
+            cur_item = self.queue_items[self._queue_current_idx]
+            cur_item["status"] = "Done" if success else "Error"
+            st = self.queue_table.item(self._queue_current_idx, 4)
+            if st:
+                st.setText("Done" if success else "Error")
+                st.setForeground(QColor("#10b981" if success else "#ef4444"))
+
+            next_idx = None
+            for i in range(self._queue_current_idx + 1, len(self.queue_items)):
+                if self.queue_items[i]["status"] == "Ready":
+                    next_idx = i
+                    break
+
+            if next_idx is not None:
+                self._queue_current_idx = next_idx
+                self._process_queue_item(next_idx)
+                return
+            else:
+                self._is_processing_queue = False
+                self.btn_q_render.setEnabled(True)
+                self.start_btn.setEnabled(True)
+                self.cancel_btn.setEnabled(False)
+                self.progress_bar.setVisible(False)
+                self.status_label.setText("Batch queue rendering complete.")
+                QMessageBox.information(
+                    self, "Batch Queue Complete",
+                    f"Finished processing {len(self.queue_items)} queued clips."
+                )
+                return
+
         self.start_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         self.progress_bar.setVisible(False)

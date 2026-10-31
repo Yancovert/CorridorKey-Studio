@@ -92,6 +92,22 @@ def main():
                     help="Export cutout as straight linear RGB instead of straight sRGB.")
     ap.add_argument("--despill_strength", type=float, default=0.5,
                     help="Despill strength from 0.0 (none) to 1.0 (full). Default: 0.5.")
+    ap.add_argument("--screen_color", choices=("green", "blue", "auto"), default="green",
+                    help="Target screen color for despill and matte processing. Default: green.")
+    ap.add_argument("--keep_solid", action="store_true",
+                    help="Preserve raw camera pixels in interior solid areas (alpha > 0.95).")
+    ap.add_argument("--solid_erode_px", type=int, default=5,
+                    help="Elliptical erosion radius in pixels for solid core safety margin.")
+    ap.add_argument("--solid_blur_px", type=int, default=5,
+                    help="Gaussian blur radius in pixels for solid core transition band.")
+    ap.add_argument("--despeckle", action="store_true",
+                    help="Enable connected-component noise cleanup on alpha matte.")
+    ap.add_argument("--despeckle_threshold", type=int, default=250,
+                    help="Minimum pixel area for connected component alpha preservation.")
+    ap.add_argument("--despeckle_dilation", type=int, default=4,
+                    help="Elliptical dilation radius for despeckle safe zone.")
+    ap.add_argument("--despeckle_blur", type=int, default=4,
+                    help="Gaussian blur radius for despeckle transition band.")
     ap.add_argument("--linear_brightness", type=float, default=1.0)
     ap.add_argument("--linear_contrast", type=float, default=1.0)
     ap.add_argument("--linear_contrast_pivot", type=float, default=0.18)
@@ -172,6 +188,14 @@ def main():
         frame_dir_linear=args.frame_dir_linear,
         cutout_linear=args.cutout_linear,
         despill_strength=args.despill_strength,
+        screen_color=args.screen_color,
+        keep_solid=args.keep_solid,
+        solid_erode_px=args.solid_erode_px,
+        solid_blur_px=args.solid_blur_px,
+        despeckle=args.despeckle,
+        despeckle_threshold=args.despeckle_threshold,
+        despeckle_dilation=args.despeckle_dilation,
+        despeckle_blur=args.despeckle_blur,
         output_format=args.output_format,
         exr_dtype=args.exr_dtype,
     )

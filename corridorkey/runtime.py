@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
+import cv2
 
 from . import color_utils as cu
 from .model import CorridorKeyV3
@@ -127,6 +128,14 @@ class InferenceConfig:
     despill_strength: float = 0.5
     output_format: str = "video"
     exr_dtype: str = "half"
+    keep_solid: bool = False
+    solid_erode_px: int = 5
+    solid_blur_px: int = 5
+    despeckle: bool = False
+    despeckle_threshold: int = 250
+    despeckle_dilation: int = 4
+    despeckle_blur: int = 4
+    screen_color: str = "green"
 
 
 # Peak GPU memory in GiB by megapixels of model input, measured at each Hann
@@ -607,17 +616,118 @@ def _linear_adjust_inverse_torch(linear: torch.Tensor, meta: dict) -> torch.Tens
     return (linear / gain - pivot) / contrast + pivot
 
 
-def _despill_average_srgb_torch(fg: torch.Tensor, strength: float = 0.5) -> torch.Tensor:
+def _detect_screen_color_from_frame(rgb_linear: torch.Tensor) -> str:
+    h, w = rgb_linear.shape[-2:]
+    inset_y = max(1, int(h * 0.05))
+    inset_x = max(1, int(w * 0.05))
+    top = rgb_linear[..., :inset_y, :]
+    bot = rgb_linear[..., -inset_y:, :]
+    left = rgb_linear[..., :, :inset_x]
+    right = rgb_linear[..., :, -inset_x:]
+    border = torch.cat([
+        top.flatten(start_dim=-2),
+        bot.flatten(start_dim=-2),
+        left.flatten(start_dim=-2),
+        right.flatten(start_dim=-2),
+    ], dim=-1)
+    mean_rgb = border.mean(dim=-1).mean(dim=0)
+    r, g, b = float(mean_rgb[0]), float(mean_rgb[1]), float(mean_rgb[2])
+    if b > r + 0.08 and b > g + 0.08:
+        return "blue"
+    return "green"
+
+
+def _despill_average_srgb_torch(fg: torch.Tensor, strength: float = 0.5, screen_color: str = "green") -> torch.Tensor:
     if strength <= 0.0:
         return fg
     r = fg[:, 0:1]
     g = fg[:, 1:2]
     b = fg[:, 2:3]
-    spill = (g - (r + b) * 0.5).clamp(min=0.0)
-    full = torch.cat([r + spill * 0.5, g - spill, b + spill * 0.5], dim=1)
+    if screen_color == "blue":
+        spill = (b - (r + g) * 0.5).clamp(min=0.0)
+        full = torch.cat([r + spill * 0.5, g + spill * 0.5, b - spill], dim=1)
+    else:
+        spill = (g - (r + b) * 0.5).clamp(min=0.0)
+        full = torch.cat([r + spill * 0.5, g - spill, b + spill * 0.5], dim=1)
     if strength >= 1.0:
         return full
     return fg * (1.0 - strength) + full * strength
+
+
+def _create_disk_kernel(radius: int, device: torch.device) -> tuple[torch.Tensor, float]:
+    y, x = torch.meshgrid(torch.arange(-radius, radius + 1, device=device),
+                          torch.arange(-radius, radius + 1, device=device), indexing="ij")
+    dist_sq = x * x + y * y
+    mask = (dist_sq <= radius * radius).float()
+    return mask.unsqueeze(0).unsqueeze(0), float(mask.sum())
+
+
+def _create_gaussian_kernel_1d(blur_px: int, device: torch.device) -> torch.Tensor:
+    ksize = 2 * blur_px + 1
+    sigma = 0.3 * ((ksize - 1.0) * 0.5 - 1.0) + 0.8
+    x = torch.arange(-blur_px, blur_px + 1, device=device).float()
+    k = torch.exp(-0.5 * (x * x) / (sigma * sigma))
+    return (k / k.sum()).view(1, 1, 1, -1)
+
+
+def _source_passthrough_torch(source_rgb: torch.Tensor, model_fg: torch.Tensor,
+                             alpha: torch.Tensor, erode_px: int = 5,
+                             blur_px: int = 5) -> torch.Tensor:
+    if erode_px <= 0 and blur_px <= 0:
+        return model_fg
+    device = alpha.device
+    dtype = alpha.dtype
+
+    interior = (alpha > 0.95).to(dtype)
+
+    if erode_px > 0:
+        disk, count = _create_disk_kernel(erode_px, device)
+        disk = disk.to(dtype)
+        conv = F.conv2d(interior, disk, padding=erode_px)
+        eroded = (conv >= (count - 1e-3)).to(dtype)
+    else:
+        eroded = interior
+
+    if blur_px > 0:
+        k_h = _create_gaussian_kernel_1d(blur_px, device).to(dtype)
+        k_v = k_h.permute(0, 1, 3, 2)
+        blurred = F.conv2d(eroded, k_h, padding=(0, blur_px))
+        blurred = F.conv2d(blurred, k_v, padding=(blur_px, 0))
+        mask = torch.where(alpha > 0.95, blurred, torch.zeros_like(blurred))
+    else:
+        mask = eroded
+
+    return mask * source_rgb + (1.0 - mask) * model_fg
+
+
+def _despeckle_alpha(alpha: torch.Tensor, area_threshold: int = 250,
+                     dilation: int = 4, blur_size: int = 4) -> torch.Tensor:
+    if area_threshold <= 0:
+        return alpha
+    device = alpha.device
+    dtype = alpha.dtype
+    cleaned_list = []
+    for b in range(alpha.shape[0]):
+        a_np = alpha[b, 0].detach().cpu().numpy()
+        bin_mask = (a_np > 0.5).astype(np.uint8)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+            bin_mask, connectivity=8)
+        clean_mask = np.zeros_like(bin_mask)
+        for lbl in range(1, num_labels):
+            if stats[lbl, cv2.CC_STAT_AREA] >= area_threshold:
+                clean_mask[labels == lbl] = 1
+        if dilation > 0:
+            kernel = cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE, (2 * dilation + 1, 2 * dilation + 1))
+            clean_mask = cv2.dilate(clean_mask, kernel)
+        safe_zone = clean_mask.astype(np.float32)
+        if blur_size > 0:
+            ksize = 2 * blur_size + 1
+            sigma = 0.3 * ((ksize - 1.0) * 0.5 - 1.0) + 0.8
+            safe_zone = cv2.GaussianBlur(safe_zone, (ksize, ksize), sigma)
+        cleaned_a = a_np * safe_zone
+        cleaned_list.append(torch.from_numpy(cleaned_a).unsqueeze(0))
+    return torch.stack(cleaned_list, dim=0).to(device=device, dtype=dtype)
 
 
 def _srgb_to_bgr_uint16_cpu(x: torch.Tensor) -> np.ndarray:
@@ -647,19 +757,21 @@ def _chw_to_bgra_f32_cpu(rgb: torch.Tensor, alpha: torch.Tensor) -> np.ndarray:
 
 def _render_predictions_exr_torch(meta: dict, outputs: set[str],
                                   checker: torch.Tensor,
-                                  logits: torch.Tensor) -> dict[str, np.ndarray]:
-    """Render a stage-2 batch as unclamped scene-linear float32 NHWC arrays.
-
-    HDR contract: `fg`, `cutout`, and `checker` color stays in decoded linear
-    light with no [0, 1] clamp and no quantization, so values above 1.0 (and
-    negative values the model may emit) survive into the EXR files. Alpha is a
-    matte and stays clamped to [0, 1].
-    """
+                                  logits: torch.Tensor,
+                                  source_rgb: torch.Tensor | None = None) -> dict[str, np.ndarray]:
     alpha_model = logits[:, 0:1].float()
     pa_model = _crop_native_torch(alpha_model, meta).clamp(0.0, 1.0)
     despill_strength = float(meta.get("despill_strength", 0.5))
 
     pa = _resize_output_torch(pa_model, meta).clamp(0.0, 1.0)
+    if meta.get("despeckle", False):
+        pa = _despeckle_alpha(
+            pa,
+            area_threshold=int(meta.get("despeckle_threshold", 250)),
+            dilation=int(meta.get("despeckle_dilation", 4)),
+            blur_size=int(meta.get("despeckle_blur", 4))
+        ).clamp(0.0, 1.0)
+
     rendered: dict[str, np.ndarray] = {}
     if "alpha" in outputs:
         rendered["alpha"] = (pa.permute(0, 2, 3, 1)
@@ -672,18 +784,35 @@ def _render_predictions_exr_torch(meta: dict, outputs: set[str],
     pf_model = _crop_native_torch(fg_model, meta)
     pf_linear = _linear_adjust_inverse_torch(cu.asinh_to_linear(pf_model), meta)
     pf_linear = _resize_output_torch(pf_linear, meta)
+
+    screen_color = str(meta.get("screen_color", "green"))
+    if source_rgb is not None:
+        src_cropped = _crop_native_torch(source_rgb.float(), meta)
+        src_lin = _linear_adjust_inverse_torch(cu.asinh_to_linear(src_cropped), meta)
+        src_lin = _resize_output_torch(src_lin, meta)
+        if screen_color == "auto":
+            screen_color = _detect_screen_color_from_frame(src_lin)
+        if meta.get("keep_solid", False):
+            pf_linear = _source_passthrough_torch(
+                src_lin, pf_linear, pa,
+                erode_px=int(meta.get("solid_erode_px", 5)),
+                blur_px=int(meta.get("solid_blur_px", 5))
+            )
+    elif screen_color == "auto":
+        screen_color = "green"
+
     if "fg" in outputs:
         rendered["fg"] = _chw_to_bgr_f32_cpu(pf_linear)
     if "cutout" in outputs:
         pf_linear_despilled = _despill_average_srgb_torch(
-            pf_linear, strength=despill_strength)
+            pf_linear, strength=despill_strength, screen_color=screen_color)
         rendered["cutout"] = _chw_to_bgra_f32_cpu(pf_linear_despilled, pa)
     if "checker" in outputs:
         checker_b = checker.to(device=pf_linear.device,
                                dtype=pf_linear.dtype).unsqueeze(0)
         bg_lin = cu.srgb_to_linear(checker_b)
         pf_despill = _despill_average_srgb_torch(
-            pf_linear, strength=despill_strength)
+            pf_linear, strength=despill_strength, screen_color=screen_color)
         comp_lin = pf_despill * pa + bg_lin * (1.0 - pa)
         rendered["checker"] = _chw_to_bgr_f32_cpu(comp_lin)
     return rendered
@@ -691,17 +820,21 @@ def _render_predictions_exr_torch(meta: dict, outputs: set[str],
 
 def _render_predictions_torch(meta: dict, outputs: set[str],
                               checker: torch.Tensor,
-                              logits: torch.Tensor) -> dict[str, np.ndarray]:
-    """Render a stage-2 batch on GPU, returning uint16 BGR/BGRA NHWC arrays.
-
-    This removes the previous per-frame numpy HDR decode, sRGB encode,
-    composition, channel shuffle, and uint8 conversion hot path.
-    """
+                              logits: torch.Tensor,
+                              source_rgb: torch.Tensor | None = None) -> dict[str, np.ndarray]:
     alpha_model = logits[:, 0:1].float()
     pa_model = _crop_native_torch(alpha_model, meta).clamp(0.0, 1.0)
     despill_strength = float(meta.get("despill_strength", 0.5))
 
     pa = _resize_output_torch(pa_model, meta).clamp(0.0, 1.0)
+    if meta.get("despeckle", False):
+        pa = _despeckle_alpha(
+            pa,
+            area_threshold=int(meta.get("despeckle_threshold", 250)),
+            dilation=int(meta.get("despeckle_dilation", 4)),
+            blur_size=int(meta.get("despeckle_blur", 4))
+        ).clamp(0.0, 1.0)
+
     rendered: dict[str, np.ndarray] = {}
     if "alpha" in outputs:
         rendered["alpha"] = _srgb_to_bgr_uint16_cpu(pa.expand(-1, 3, -1, -1))
@@ -713,21 +846,48 @@ def _render_predictions_torch(meta: dict, outputs: set[str],
     pf_linear = _linear_adjust_inverse_torch(cu.asinh_to_linear(pf_model), meta)
     pf_linear_pos = pf_linear.clamp(min=0.0)
     pf = _resize_output_torch(cu.linear_to_srgb(pf_linear_pos), meta).clamp(0.0, 1.0)
+
+    screen_color = str(meta.get("screen_color", "green"))
+    if source_rgb is not None:
+        src_cropped = _crop_native_torch(source_rgb.float(), meta)
+        src_lin = _linear_adjust_inverse_torch(cu.asinh_to_linear(src_cropped), meta)
+        src_lin_pos = src_lin.clamp(min=0.0)
+        src_srgb = _resize_output_torch(cu.linear_to_srgb(src_lin_pos), meta).clamp(0.0, 1.0)
+        if screen_color == "auto":
+            screen_color = _detect_screen_color_from_frame(src_lin)
+        if meta.get("keep_solid", False):
+            pf = _source_passthrough_torch(
+                src_srgb, pf, pa,
+                erode_px=int(meta.get("solid_erode_px", 5)),
+                blur_px=int(meta.get("solid_blur_px", 5))
+            )
+            src_lin_resized = _resize_output_torch(src_lin_pos, meta)
+            pf_linear_pos = _source_passthrough_torch(
+                src_lin_resized, pf_linear_pos, pa,
+                erode_px=int(meta.get("solid_erode_px", 5)),
+                blur_px=int(meta.get("solid_blur_px", 5))
+            )
+    elif screen_color == "auto":
+        screen_color = "green"
+
     if "fg" in outputs:
         rendered["fg"] = _srgb_to_bgr_uint16_cpu(pf)
     if "cutout" in outputs:
-        pf_linear_despilled = _despill_average_srgb_torch(pf_linear_pos, strength=despill_strength)
+        pf_linear_despilled = _despill_average_srgb_torch(
+            pf_linear_pos, strength=despill_strength, screen_color=screen_color)
         if meta.get("cutout_linear", False):
             pf_linear_despilled_resized = _resize_output_torch(pf_linear_despilled, meta).clamp(0.0, 1.0)
             rendered["cutout"] = _srgb_to_bgra_uint16_cpu(pf_linear_despilled_resized, pa)
         else:
-            pf_despill = _despill_average_srgb_torch(pf, strength=despill_strength)
+            pf_despill = _despill_average_srgb_torch(
+                pf, strength=despill_strength, screen_color=screen_color)
             rendered["cutout"] = _srgb_to_bgra_uint16_cpu(pf_despill, pa)
     if "checker" in outputs:
         checker_b = checker.to(device=pf.device, dtype=pf.dtype).unsqueeze(0)
         bg_lin = cu.srgb_to_linear(checker_b)
         alpha = pa
-        pf_despill = _despill_average_srgb_torch(pf, strength=despill_strength)
+        pf_despill = _despill_average_srgb_torch(
+            pf, strength=despill_strength, screen_color=screen_color)
         comp_despill_lin = (
             cu.srgb_to_linear(pf_despill) * alpha + bg_lin * (1.0 - alpha))
         comp_despill = cu.linear_to_srgb(
@@ -773,6 +933,14 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
     H_out, W_out = meta["output_hw"]
     meta["cutout_linear"] = cfg.cutout_linear
     meta["despill_strength"] = cfg.despill_strength
+    meta["keep_solid"] = cfg.keep_solid
+    meta["solid_erode_px"] = cfg.solid_erode_px
+    meta["solid_blur_px"] = cfg.solid_blur_px
+    meta["despeckle"] = cfg.despeckle
+    meta["despeckle_threshold"] = cfg.despeckle_threshold
+    meta["despeckle_dilation"] = cfg.despeckle_dilation
+    meta["despeckle_blur"] = cfg.despeckle_blur
+    meta["screen_color"] = cfg.screen_color
     fps = float(meta["native_fps"])
     clip_name = raw_clip_name(input_path)
     checker = make_checker(H_out, W_out)
@@ -895,7 +1063,7 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                         logits = logits[0]
                 render_fn = (_render_predictions_exr_torch if use_exr
                              else _render_predictions_torch)
-                rendered = render_fn(meta, cfg.outputs, checker_t, logits[0])
+                rendered = render_fn(meta, cfg.outputs, checker_t, logits[0], source_rgb=rgb_t[0])
                 for name, frames in rendered.items():
                     writers[name].write_many(frames)
                 del logits, baton_t, rgb_t, baton_np, rendered

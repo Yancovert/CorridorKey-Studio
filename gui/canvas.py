@@ -10,6 +10,7 @@ class PreviewCanvas(QWidget):
         super().__init__(parent)
         self.setMinimumSize(400, 260)
         self._pixmap_original: QPixmap | None = None
+        self._pixmap_original: QPixmap | None = None
         self._pixmap_result: QPixmap | None = None
         self._pixmaps: dict[str, QPixmap | None] = {
             "original": None,
@@ -17,11 +18,18 @@ class PreviewCanvas(QWidget):
             "alpha": None,
             "fg": None,
             "checker": None,
+            "hint": None,
         }
-        self._view_mode: str = "split" # "split", "checker", "alpha", "fg", "original"
-        self._split_ratio: float = 0.5
-        self._is_dragging_split: bool = False
-        self._status_text: str = "Drag and drop video here"
+        self._view_mode: str = "split_v"
+        self._split_ratio_x: float = 0.5
+        self._split_ratio_y: float = 0.5
+        self._overlay_opacity: float = 0.5
+        self._primary_key: str = "original"
+        self._secondary_key: str = "cutout"
+        self._swapped: bool = False
+        self._is_dragging_split_x: bool = False
+        self._is_dragging_split_y: bool = False
+        self._status_text: str = "Drop video here to inspect"
 
         self.setMouseTracking(True)
         self.setStyleSheet("background-color: #0b0f14; border-radius: 6px; border: 1px solid #21262d;")
@@ -52,8 +60,44 @@ class PreviewCanvas(QWidget):
         self.update()
 
     def set_view_mode(self, mode: str):
+        if mode == "split":
+            mode = "split_v"
         self._view_mode = mode
         self.update()
+
+    def set_swapped(self, swapped: bool):
+        self._swapped = swapped
+        self.update()
+
+    def toggle_swap(self):
+        self._swapped = not self._swapped
+        self.update()
+
+    def set_overlay_opacity(self, opacity: float):
+        self._overlay_opacity = max(0.0, min(1.0, float(opacity)))
+        self.update()
+
+    def set_comparison_pairs(self, primary: str, secondary: str):
+        self._primary_key = primary
+        self._secondary_key = secondary
+        self.update()
+
+    def set_buffer_a(self, key: str):
+        self._primary_key = key
+        self.update()
+
+    def set_buffer_b(self, key: str):
+        self._secondary_key = key
+        self.update()
+
+    def get_buffer_a(self) -> str:
+        return self._primary_key
+
+    def get_buffer_b(self) -> str:
+        return self._secondary_key
+
+    def is_swapped(self) -> bool:
+        return self._swapped
 
     def set_status_text(self, text: str):
         self._status_text = text
@@ -61,10 +105,7 @@ class PreviewCanvas(QWidget):
 
     def set_zoom_mode(self, mode: str):
         self._zoom_mode = mode
-        if mode == "fit":
-            self._zoom_scale = 1.0
-            self._pan_offset = QPointF(0, 0)
-        elif mode == "100%":
+        if mode in ("fit", "100%"):
             self._zoom_scale = 1.0
             self._pan_offset = QPointF(0, 0)
         elif mode == "200%":
@@ -83,25 +124,40 @@ class PreviewCanvas(QWidget):
         super().wheelEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+        if event.button() == Qt.MouseButton.MiddleButton or (
+            event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
             self._is_panning = True
             self._last_mouse_pos = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
 
-        if self._view_mode == "split" and event.button() == Qt.MouseButton.LeftButton:
-            if self._target_rect.width() > 0:
-                split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio
-                if abs(event.position().x() - split_x) <= 12:
-                    self._is_dragging_split = True
+        if event.button() == Qt.MouseButton.LeftButton and self._target_rect.width() > 0:
+            if self._view_mode in ("split_v", "split"):
+                split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio_x
+                if abs(event.position().x() - split_x) <= 14:
+                    self._is_dragging_split_x = True
                     event.accept()
                     return
                 elif self._target_rect.contains(event.position()):
-                    # click anywhere inside video to jump split line
                     ratio = (event.position().x() - self._target_rect.x()) / self._target_rect.width()
-                    self._split_ratio = max(0.0, min(1.0, ratio))
-                    self._is_dragging_split = True
+                    self._split_ratio_x = max(0.0, min(1.0, ratio))
+                    self._is_dragging_split_x = True
+                    self.update()
+                    event.accept()
+                    return
+
+            elif self._view_mode == "split_h":
+                split_y = self._target_rect.y() + self._target_rect.height() * self._split_ratio_y
+                if abs(event.position().y() - split_y) <= 14:
+                    self._is_dragging_split_y = True
+                    event.accept()
+                    return
+                elif self._target_rect.contains(event.position()):
+                    ratio = (event.position().y() - self._target_rect.y()) / self._target_rect.height()
+                    self._split_ratio_y = max(0.0, min(1.0, ratio))
+                    self._is_dragging_split_y = True
                     self.update()
                     event.accept()
                     return
@@ -117,20 +173,37 @@ class PreviewCanvas(QWidget):
             event.accept()
             return
 
-        if self._is_dragging_split:
+        if self._is_dragging_split_x:
             if self._target_rect.width() > 0:
                 ratio = (event.position().x() - self._target_rect.x()) / self._target_rect.width()
-                self._split_ratio = max(0.0, min(1.0, ratio))
+                self._split_ratio_x = max(0.0, min(1.0, ratio))
                 self.update()
                 event.accept()
                 return
-        elif self._view_mode == "split":
-            if self._target_rect.width() > 0:
-                split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio
-                if abs(event.position().x() - split_x) <= 12 and self._target_rect.top() <= event.position().y() <= self._target_rect.bottom():
-                    self.setCursor(Qt.CursorShape.SplitHCursor)
-                else:
-                    self.setCursor(Qt.CursorShape.ArrowCursor)
+
+        if self._is_dragging_split_y:
+            if self._target_rect.height() > 0:
+                ratio = (event.position().y() - self._target_rect.y()) / self._target_rect.height()
+                self._split_ratio_y = max(0.0, min(1.0, ratio))
+                self.update()
+                event.accept()
+                return
+
+        if self._view_mode in ("split_v", "split") and self._target_rect.width() > 0:
+            split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio_x
+            if abs(event.position().x() - split_x) <= 14 and self._target_rect.top() <= event.position().y() <= self._target_rect.bottom():
+                self.setCursor(Qt.CursorShape.SplitHCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+        elif self._view_mode == "split_h" and self._target_rect.height() > 0:
+            split_y = self._target_rect.y() + self._target_rect.height() * self._split_ratio_y
+            if abs(event.position().y() - split_y) <= 14 and self._target_rect.left() <= event.position().x() <= self._target_rect.right():
+                self.setCursor(Qt.CursorShape.SplitVCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -139,8 +212,13 @@ class PreviewCanvas(QWidget):
             self.setCursor(Qt.CursorShape.ArrowCursor)
             event.accept()
             return
-        if self._is_dragging_split:
-            self._is_dragging_split = False
+        if self._is_dragging_split_x:
+            self._is_dragging_split_x = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        if self._is_dragging_split_y:
+            self._is_dragging_split_y = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
             event.accept()
             return
@@ -163,6 +241,21 @@ class PreviewCanvas(QWidget):
                 )
         painter.restore()
 
+    def _get_buffer(self, key: str) -> QPixmap | None:
+        if key == "original":
+            return self._pixmaps.get("original") or self._pixmap_original
+        if key in ("cutout", "result"):
+            return self._pixmaps.get("cutout") or self._pixmap_result
+        if key == "checker":
+            return self._pixmaps.get("checker")
+        if key == "alpha":
+            return self._pixmaps.get("alpha")
+        if key == "fg":
+            return self._pixmaps.get("fg")
+        if key == "hint":
+            return self._pixmaps.get("hint")
+        return self._pixmaps.get(key)
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -171,13 +264,11 @@ class PreviewCanvas(QWidget):
         w, h = self.width(), self.height()
 
         ref_pixmap = (
-            self._pixmaps.get("original")
-            or self._pixmaps.get("cutout")
-            or self._pixmaps.get("checker")
-            or self._pixmaps.get("fg")
-            or self._pixmaps.get("alpha")
-            or self._pixmap_original
-            or self._pixmap_result
+            self._get_buffer("original")
+            or self._get_buffer("cutout")
+            or self._get_buffer("checker")
+            or self._get_buffer("fg")
+            or self._get_buffer("alpha")
         )
 
         if ref_pixmap is None:
@@ -204,7 +295,6 @@ class PreviewCanvas(QWidget):
             painter.drawText(QRectF(box_rect.x(), box_rect.y() + 48, box_rect.width(), 20), Qt.AlignmentFlag.AlignCenter, "Supports MP4, MOV, MKV, WebM, AVI")
             return
 
-        # fit inside canvas keeping aspect ratio and apply zoom / pan
         base_size = ref_pixmap.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio)
         w_scaled = base_size.width() * self._zoom_scale
         h_scaled = base_size.height() * self._zoom_scale
@@ -213,60 +303,71 @@ class PreviewCanvas(QWidget):
         self._target_rect = QRectF(x, y, w_scaled, h_scaled)
         target_rect = self._target_rect
 
-        pm_orig = self._pixmaps.get("original") or self._pixmap_original
-        pm_cutout = self._pixmaps.get("cutout") or self._pixmap_result
-        pm_checker = self._pixmaps.get("checker")
-        pm_alpha = self._pixmaps.get("alpha")
-        pm_fg = self._pixmaps.get("fg")
+        buf_a_key = self._secondary_key if self._swapped else self._primary_key
+        buf_b_key = self._primary_key if self._swapped else self._secondary_key
 
-        if self._view_mode == "original":
-            if pm_orig:
-                painter.drawPixmap(target_rect.toRect(), pm_orig)
+        pm_a = self._get_buffer(buf_a_key)
+        pm_b = self._get_buffer(buf_b_key)
+        if pm_b is None:
+            pm_b = self._get_buffer("cutout") or self._get_buffer("checker")
 
-        elif self._view_mode == "alpha":
-            if pm_alpha:
-                painter.drawPixmap(target_rect.toRect(), pm_alpha)
-            elif pm_cutout:
+        if self._view_mode == "single":
+            if buf_a_key in ("cutout", "checker"):
                 self._draw_checkerboard(painter, target_rect)
-                painter.drawPixmap(target_rect.toRect(), pm_cutout)
+            if pm_a:
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+
+        elif self._view_mode in ("original", "plate"):
+            pm = self._get_buffer("original")
+            if pm:
+                painter.drawPixmap(target_rect.toRect(), pm)
+
+        elif self._view_mode in ("alpha", "matte"):
+            pm = self._get_buffer("alpha")
+            if pm:
+                painter.drawPixmap(target_rect.toRect(), pm)
+            elif pm_b:
+                self._draw_checkerboard(painter, target_rect)
+                painter.drawPixmap(target_rect.toRect(), pm_b)
 
         elif self._view_mode == "fg":
-            if pm_fg:
-                painter.drawPixmap(target_rect.toRect(), pm_fg)
-            elif pm_orig:
-                painter.drawPixmap(target_rect.toRect(), pm_orig)
+            pm = self._get_buffer("fg") or self._get_buffer("original")
+            if pm:
+                painter.drawPixmap(target_rect.toRect(), pm)
 
-        elif self._view_mode == "checker":
+        elif self._view_mode in ("checker", "composite"):
             self._draw_checkerboard(painter, target_rect)
-            if pm_cutout:
-                painter.drawPixmap(target_rect.toRect(), pm_cutout)
-            elif pm_checker:
-                painter.drawPixmap(target_rect.toRect(), pm_checker)
+            pm = self._get_buffer("cutout") or self._get_buffer("checker")
+            if pm:
+                painter.drawPixmap(target_rect.toRect(), pm)
 
-        elif self._view_mode == "split":
-            split_x = target_rect.x() + target_rect.width() * self._split_ratio
+        elif self._view_mode == "cutout":
+            self._draw_checkerboard(painter, target_rect)
+            pm = self._get_buffer("cutout")
+            if pm:
+                painter.drawPixmap(target_rect.toRect(), pm)
+
+        elif self._view_mode in ("split_v", "split"):
+            split_x = target_rect.x() + target_rect.width() * self._split_ratio_x
+            left_width = split_x - target_rect.x()
             right_width = target_rect.right() - split_x
 
-            # checkerboard background strictly under transparent right side
             if right_width > 0:
                 right_rect = QRectF(split_x, target_rect.y(), right_width, target_rect.height())
                 self._draw_checkerboard(painter, right_rect)
 
-            # draw original clipped to left
-            if pm_orig:
+            if pm_a and left_width > 0:
                 painter.save()
-                painter.setClipRect(QRectF(target_rect.x(), target_rect.y(), target_rect.width() * self._split_ratio, target_rect.height()))
-                painter.drawPixmap(target_rect.toRect(), pm_orig)
+                painter.setClipRect(QRectF(target_rect.x(), target_rect.y(), left_width, target_rect.height()))
+                painter.drawPixmap(target_rect.toRect(), pm_a)
                 painter.restore()
 
-            # draw keyed result clipped to right
-            res_to_draw = pm_cutout or pm_checker
-            if res_to_draw and right_width > 0:
+            if pm_b and right_width > 0:
                 painter.save()
                 painter.setClipRect(QRectF(split_x, target_rect.y(), right_width, target_rect.height()))
-                painter.drawPixmap(target_rect.toRect(), res_to_draw)
+                painter.drawPixmap(target_rect.toRect(), pm_b)
                 painter.restore()
-            elif not res_to_draw and right_width > 0:
+            elif not pm_b and right_width > 0:
                 painter.save()
                 font = painter.font()
                 font.setPointSize(10)
@@ -275,23 +376,71 @@ class PreviewCanvas(QWidget):
                 painter.drawText(QRectF(split_x, target_rect.y(), right_width, target_rect.height()), Qt.AlignmentFlag.AlignCenter, "Cutout Preview\n(Run keying to generate)")
                 painter.restore()
 
-            # draw divider line
             painter.setPen(QPen(QColor(230, 235, 245), 2))
             painter.drawLine(QPointF(split_x, target_rect.y()), QPointF(split_x, target_rect.bottom()))
 
-            # divider handle indicator
             center_y = target_rect.y() + target_rect.height() / 2
             painter.setBrush(QBrush(QColor(240, 244, 250)))
             painter.setPen(QPen(QColor(30, 34, 40), 1.5))
-            painter.drawEllipse(QPointF(split_x, center_y), 5, 5)
-        else:
-            if pm_cutout:
-                self._draw_checkerboard(painter, target_rect)
-                painter.drawPixmap(target_rect.toRect(), pm_cutout)
-            elif pm_orig:
-                painter.drawPixmap(target_rect.toRect(), pm_orig)
+            painter.drawEllipse(QPointF(split_x, center_y), 6, 6)
 
-        # draw subtle zoom badge only when zoomed in/out
+        elif self._view_mode == "split_h":
+            split_y = target_rect.y() + target_rect.height() * self._split_ratio_y
+            top_height = split_y - target_rect.y()
+            bottom_height = target_rect.bottom() - split_y
+
+            if bottom_height > 0:
+                bottom_rect = QRectF(target_rect.x(), split_y, target_rect.width(), bottom_height)
+                self._draw_checkerboard(painter, bottom_rect)
+
+            if pm_a and top_height > 0:
+                painter.save()
+                painter.setClipRect(QRectF(target_rect.x(), target_rect.y(), target_rect.width(), top_height))
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+                painter.restore()
+
+            if pm_b and bottom_height > 0:
+                painter.save()
+                painter.setClipRect(QRectF(target_rect.x(), split_y, target_rect.width(), bottom_height))
+                painter.drawPixmap(target_rect.toRect(), pm_b)
+                painter.restore()
+
+            painter.setPen(QPen(QColor(230, 235, 245), 2))
+            painter.drawLine(QPointF(target_rect.x(), split_y), QPointF(target_rect.right(), split_y))
+
+            center_x = target_rect.x() + target_rect.width() / 2
+            painter.setBrush(QBrush(QColor(240, 244, 250)))
+            painter.setPen(QPen(QColor(30, 34, 40), 1.5))
+            painter.drawEllipse(QPointF(center_x, split_y), 6, 6)
+
+        elif self._view_mode == "difference":
+            painter.fillRect(target_rect, QColor(0, 0, 0))
+            if pm_a and pm_b:
+                painter.save()
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+                painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Difference)
+                painter.drawPixmap(target_rect.toRect(), pm_b)
+                painter.restore()
+            elif pm_a:
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+
+        elif self._view_mode == "overlay":
+            self._draw_checkerboard(painter, target_rect)
+            if pm_a:
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+            if pm_b:
+                painter.save()
+                painter.setOpacity(self._overlay_opacity)
+                painter.drawPixmap(target_rect.toRect(), pm_b)
+                painter.restore()
+
+        else:
+            if pm_b:
+                self._draw_checkerboard(painter, target_rect)
+                painter.drawPixmap(target_rect.toRect(), pm_b)
+            elif pm_a:
+                painter.drawPixmap(target_rect.toRect(), pm_a)
+
         if self._zoom_mode != "fit" or abs(self._zoom_scale - 1.0) > 1e-3:
             zoom_text = f"{int(self._zoom_scale * 100)}%"
             painter.setPen(QColor(140, 148, 160))

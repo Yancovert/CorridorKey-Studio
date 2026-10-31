@@ -1,0 +1,65 @@
+[
+  {
+    "version": "2.2.0",
+    "date": "2026-11-01",
+    "title": "CorridorKey Workbench Parity & Multi-View Studio",
+    "highlights": "Complete parity with official Workbench 2.0 algorithms, multi-mode viewport comparisons, and batch render queue.",
+    "features": [
+      "Multi-Mode Comparison Viewport: Split horizontal, split vertical, math difference, opacity overlay, and single view modes",
+      "Buffer A / Buffer B comparison switching with instant keyboard swap (X)",
+      "Batch Render Queue: Collapsible drawer for batch processing multiple videos sequentially",
+      "Screen Color Auto-Detection: Automatically detects green or blue backing per shot with live despill unmixing",
+      "Core Solid Preservation: Keep original source details in solid core matte with erosion and edge blur tuning",
+      "Despeckle Noise Cleanup: Connected component filter to eliminate floating background noise islands",
+      "Alpha Guidance Keyframing: Set current frame as reference hint, configure hint quality, and carry memory across shots",
+      "Live VRAM Telemetry: GPU badge displays real-time memory usage and headroom"
+    ],
+    "improvements": [
+      "Optimized CUDA tensor cropping for native resolution passthrough",
+      "Standardized UI layout with charcoal studio palette and high-contrast badges",
+      "Interactive patch notes dialog with multi-update catchup support"
+    ],
+    "fixes": [
+      "Resolved tensor dimension mismatch during solid core source passthrough",
+      "Fixed border color unmixing during blue screen despill calculations"
+    ]
+  },
+  {
+    "version": "2.1.0",
+    "date": "2026-10-28",
+    "title": "Quality Slider & Export Formats",
+    "highlights": "Visual quality slider for exports and support for multiple video container formats.",
+    "features": [
+      "Interactive Quality Slider: 1 to 10 scale adjusting CRF, bitrate, and encoder presets",
+      "Multi-Format Video Export: Support for MP4 (H.264), MOV (ProRes 4444 / ProRes HQ), and PNG/EXR image sequences",
+      "Linear Color Management: Asinh tone curve recovery with configurable brightness and contrast pivots"
+    ],
+    "improvements": [
+      "Enhanced FFmpeg hardware encoding flags for NVIDIA NVENC",
+      "Streamlined export settings inspector"
+    ],
+    "fixes": [
+      "Fixed audio stream preservation when remuxing export cutouts",
+      "Resolved alpha matte invert toggle behavior in viewer"
+    ]
+  },
+  {
+    "version": "2.0.0",
+    "date": "2026-10-20",
+    "title": "CorridorKey Studio Re-architecture",
+    "highlights": "Complete overhaul of GUI with modern PySide6 dark theme and PyTorch runtime engine.",
+    "features": [
+      "Native PySide6 desktop interface with modern dark studio design",
+      "PyTorch runtime pipeline replacing legacy ONNX execution",
+      "Temporal Hann windowing streaming for long video processing with bounded VRAM",
+      "Hybrid GPU offloading for systems with limited video memory"
+    ],
+    "improvements": [
+      "Faster startup time and lazy model weight loading",
+      "Cross-platform support for Linux and Windows"
+    ],
+    "fixes": [
+      "Fixed out-of-memory errors on 4K footage"
+    ]
+  }
+]

@@ -62,6 +62,14 @@ class KeyerEngineWorker(QThread):
         preset: str = "medium",
         bitrate: str | None = None,
         ffmpeg_threads: int = 2,
+        keep_solid: bool = False,
+        solid_erode_px: int = 5,
+        solid_blur_px: int = 5,
+        despeckle: bool = False,
+        despeckle_threshold: int = 250,
+        despeckle_dilation: int = 4,
+        despeckle_blur: int = 4,
+        screen_color: str = "green",
         parent=None,
         **kwargs,
     ):
@@ -140,6 +148,14 @@ class KeyerEngineWorker(QThread):
         self.preset = preset
         self.bitrate = bitrate
         self.ffmpeg_threads = ffmpeg_threads
+        self.keep_solid = keep_solid
+        self.solid_erode_px = solid_erode_px
+        self.solid_blur_px = solid_blur_px
+        self.despeckle = despeckle
+        self.despeckle_threshold = despeckle_threshold
+        self.despeckle_dilation = despeckle_dilation
+        self.despeckle_blur = despeckle_blur
+        self.screen_color = screen_color
         self.cuda_device_index = kwargs.get("cuda_device_index")
 
         self._process: subprocess.Popen | None = None
@@ -219,6 +235,25 @@ class KeyerEngineWorker(QThread):
                 "--outputs", "alpha", "fg", "checker", "cutout",
                 "--despill_strength", str(self.despill_strength),
             ]
+
+            if self.screen_color and self.screen_color != "green":
+                cmd.extend(["--screen_color", self.screen_color])
+
+            if self.keep_solid:
+                cmd.append("--keep_solid")
+                if self.solid_erode_px != 5:
+                    cmd.extend(["--solid_erode_px", str(self.solid_erode_px)])
+                if self.solid_blur_px != 5:
+                    cmd.extend(["--solid_blur_px", str(self.solid_blur_px)])
+
+            if self.despeckle:
+                cmd.append("--despeckle")
+                if self.despeckle_threshold != 250:
+                    cmd.extend(["--despeckle_threshold", str(self.despeckle_threshold)])
+                if self.despeckle_dilation != 4:
+                    cmd.extend(["--despeckle_dilation", str(self.despeckle_dilation)])
+                if self.despeckle_blur != 4:
+                    cmd.extend(["--despeckle_blur", str(self.despeckle_blur)])
 
             if self.model_scale != 1.0:
                 cmd.extend(["--model_scale", str(self.model_scale)])
