@@ -370,7 +370,7 @@ static gpointer install_worker_thread(gpointer user_data) {
         }
 
         char chmod_cmd[1024];
-        snprintf(chmod_cmd, sizeof(chmod_cmd), "chmod +x \"%s/launch_gui.sh\"", params->target_dir);
+        snprintf(chmod_cmd, sizeof(chmod_cmd), "chmod +x \"%s/launch_gui.sh\" \"%s/uninstall.sh\" 2>/dev/null || true", params->target_dir, params->target_dir);
         system(chmod_cmd);
 
         // verify python environment
@@ -468,7 +468,7 @@ static gpointer install_worker_thread(gpointer user_data) {
         }
 
         char chmod_cmd[1024];
-        snprintf(chmod_cmd, sizeof(chmod_cmd), "chmod +x \"%s/launch_gui.sh\"", params->target_dir);
+        snprintf(chmod_cmd, sizeof(chmod_cmd), "chmod +x \"%s/launch_gui.sh\" \"%s/uninstall.sh\" 2>/dev/null || true", params->target_dir, params->target_dir);
         system(chmod_cmd);
 
         send_progress(0.20, "Setting up virtual environment...");
