@@ -24,7 +24,7 @@ class PreviewCanvas(QWidget):
         self._status_text: str = "Drag and drop video here"
 
         self.setMouseTracking(True)
-        self.setStyleSheet("background-color: #070707; border-radius: 4px; border: 1px solid #161616;")
+        self.setStyleSheet("background-color: #0b0f14; border-radius: 6px; border: 1px solid #21262d;")
 
         # zoom & pan state
         self._zoom_scale: float = 1.0
@@ -164,7 +164,11 @@ class PreviewCanvas(QWidget):
         )
 
         if ref_pixmap is None:
-            painter.setPen(QColor(140, 148, 160))
+            font = painter.font()
+            font.setPointSize(12)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.setPen(QColor(139, 148, 158))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._status_text)
             return
 
