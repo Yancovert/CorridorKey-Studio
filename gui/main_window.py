@@ -26,8 +26,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CorridorKey Studio")
-        self.resize(1360, 920)
-        self.setMinimumSize(1020, 680)
+        self.resize(1180, 780)
+        self.setMinimumSize(800, 560)
         self.app_root = Path(__file__).resolve().parents[1]
 
         icon_path = Path(__file__).resolve().parent / "icon.png"
@@ -58,6 +58,7 @@ class MainWindow(QMainWindow):
         self.is_playing: bool = False
         self.playback_timer: QTimer = QTimer(self)
         self.playback_timer.timeout.connect(self._on_playback_tick)
+        self.output_dir: Path = Path("./outputs").resolve()
 
         self._setup_theme()
         self._setup_ui()
@@ -78,203 +79,203 @@ class MainWindow(QMainWindow):
         self.setFont(global_font)
 
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(11, 14, 20))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor(240, 246, 252))
-        palette.setColor(QPalette.ColorRole.Base, QColor(22, 27, 34))
-        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(13, 17, 23))
-        palette.setColor(QPalette.ColorRole.Text, QColor(240, 246, 252))
-        palette.setColor(QPalette.ColorRole.Button, QColor(22, 27, 34))
-        palette.setColor(QPalette.ColorRole.ButtonText, QColor(240, 246, 252))
+        palette.setColor(QPalette.ColorRole.Window, QColor(26, 29, 33))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(230, 234, 240))
+        palette.setColor(QPalette.ColorRole.Base, QColor(23, 26, 30))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(30, 34, 39))
+        palette.setColor(QPalette.ColorRole.Text, QColor(230, 234, 240))
+        palette.setColor(QPalette.ColorRole.Button, QColor(36, 40, 46))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(213, 218, 222))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(43, 85, 128))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
         self.setPalette(palette)
 
-        # sleek high-contrast dark card theme with global nunito sans typography
+        # clean, cohesive professional studio theme
         self.setStyleSheet("""
             * {
                 font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             }
             QMainWindow, QWidget#centralWidget, QWidget#leftPanel, QWidget#controlsWidget, QScrollArea, QWidget#scrollAreaWidgetContents {
-                background-color: #0b0e14;
-                color: #e6edf3;
+                background-color: #1a1d21;
+                color: #dce1e7;
             }
             QScrollArea {
                 background-color: transparent;
                 border: none;
             }
             QScrollBar:vertical {
-                background: #0b0e14;
-                width: 8px;
+                background: transparent;
+                width: 6px;
                 margin: 0px;
             }
             QScrollBar::handle:vertical {
-                background: #21262d;
-                min-height: 28px;
-                border-radius: 4px;
+                background: #2f353d;
+                min-height: 24px;
+                border-radius: 3px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #30363d;
+                background: #3d4550;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;
             }
             QGroupBox {
-                background-color: #12151a;
-                border: 1px solid #21262d;
+                background-color: #21252b;
+                border: 1px solid #2e343d;
                 border-radius: 5px;
-                margin-top: 16px;
-                padding: 14px 10px 10px 10px;
+                margin-top: 14px;
+                padding: 10px 8px 8px 8px;
                 font-weight: 600;
                 font-size: 11.5px;
-                color: #c9d1d9;
+                color: #b0bac5;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                padding: 0px 6px;
+                padding: 0px 4px;
                 left: 8px;
-                top: 2px;
-                background-color: #0b0e14;
-                color: #8b949e;
+                top: 1px;
+                background-color: #1a1d21;
+                color: #7f8a96;
                 font-size: 11px;
                 font-weight: 600;
             }
             QComboBox {
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                padding: 5px 10px;
-                color: #f0f6fc;
-                font-size: 12px;
+                padding: 4px 8px;
+                color: #e6eaef;
+                font-size: 11.5px;
                 min-height: 22px;
             }
             QComboBox:hover {
-                border-color: #484f58;
-                background-color: #1c212a;
+                border-color: #454d58;
+                background-color: #1b1f24;
             }
             QComboBox:focus {
-                border-color: #385175;
-                background-color: #161b22;
+                border-color: #3b82f6;
             }
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 24px;
-                border-left: 1px solid #30363d;
+                width: 20px;
+                border-left: 1px solid #333942;
                 border-top-right-radius: 4px;
                 border-bottom-right-radius: 4px;
-                background-color: #1b212a;
+                background-color: #1c2025;
             }
             QComboBox::down-arrow {
                 width: 0px;
                 height: 0px;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 5px solid #6e7681;
+                border-top: 5px solid #717a86;
                 margin-right: 2px;
             }
             QComboBox::down-arrow:hover {
-                border-top-color: #f0f6fc;
+                border-top-color: #e6eaef;
             }
             QComboBox QAbstractItemView {
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: #1a1d21;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                color: #f0f6fc;
-                selection-background-color: #26354a;
+                color: #e6eaef;
+                selection-background-color: #244166;
                 selection-color: #ffffff;
                 padding: 4px;
             }
             QSpinBox, QDoubleSpinBox, QLineEdit {
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                padding: 5px 10px;
-                color: #f0f6fc;
-                font-size: 12px;
+                padding: 4px 6px;
+                color: #e6eaef;
+                font-size: 11.5px;
                 min-height: 22px;
             }
             QSpinBox:hover, QDoubleSpinBox:hover, QLineEdit:hover {
-                border-color: #484f58;
-                background-color: #1b212a;
+                border-color: #454d58;
+                background-color: #1b1f24;
             }
             QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {
-                border-color: #385175;
-                background-color: #161b22;
+                border-color: #3b82f6;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button {
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 20px;
-                border-left: 1px solid #30363d;
-                border-bottom: 1px solid #30363d;
-                background-color: #1b212a;
+                width: 18px;
+                border-left: 1px solid #333942;
+                border-bottom: 1px solid #333942;
+                background-color: #1c2025;
                 border-top-right-radius: 4px;
             }
             QSpinBox::down-button, QDoubleSpinBox::down-button {
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 20px;
-                border-left: 1px solid #30363d;
-                background-color: #1b212a;
+                width: 18px;
+                border-left: 1px solid #333942;
+                background-color: #1c2025;
                 border-bottom-right-radius: 4px;
             }
             QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
             QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-                background-color: #242c38;
+                background-color: #262c33;
             }
             QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
                 width: 0px;
                 height: 0px;
                 border-left: 3px solid transparent;
                 border-right: 3px solid transparent;
-                border-bottom: 4px solid #8b949e;
+                border-bottom: 4px solid #717a86;
             }
             QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
                 width: 0px;
                 height: 0px;
                 border-left: 3px solid transparent;
                 border-right: 3px solid transparent;
-                border-top: 4px solid #8b949e;
+                border-top: 4px solid #717a86;
             }
             QCheckBox {
-                color: #c9d1d9;
-                font-size: 12px;
-                spacing: 8px;
+                color: #b0bac5;
+                font-size: 11.5px;
+                spacing: 6px;
             }
             QCheckBox::indicator {
-                width: 15px;
-                height: 15px;
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                width: 14px;
+                height: 14px;
+                background-color: #171a1e;
+                border: 1px solid #333942;
                 border-radius: 3px;
             }
             QCheckBox::indicator:hover {
-                border-color: #484f58;
+                border-color: #454d58;
             }
             QCheckBox::indicator:checked {
-                background-color: #27384e;
-                border-color: #3e5677;
+                background-color: #254d79;
+                border-color: #3b82f6;
             }
             QPushButton {
-                background-color: #161b22;
-                color: #c9d1d9;
-                border: 1px solid #30363d;
+                background-color: #24282e;
+                color: #b6c2cf;
+                border: 1px solid #333942;
                 border-radius: 4px;
-                padding: 6px 14px;
-                font-size: 12px;
+                padding: 4px 10px;
+                font-size: 11.5px;
                 font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #21262d;
-                border-color: #484f58;
-                color: #f0f6fc;
+                background-color: #2c323a;
+                border-color: #444c57;
+                color: #ffffff;
             }
             QPushButton:pressed {
-                background-color: #1b212a;
+                background-color: #1d2126;
             }
             QPushButton:disabled {
-                background-color: #0d1117;
-                color: #484f58;
-                border-color: #21262d;
+                background-color: #16181b;
+                color: #4e555e;
+                border-color: #24282d;
             }
         """)
 
@@ -299,72 +300,52 @@ class MainWindow(QMainWindow):
         # 1. header bar (clean and professional)
         header_bar = QHBoxLayout()
         header_bar.setContentsMargins(0, 0, 0, 0)
-        header_bar.setSpacing(8)
+        header_bar.setSpacing(6)
 
         title_label = QLabel("CorridorKey Studio")
-        title_label.setStyleSheet("font-size: 17px; font-weight: 700; color: #f0f6fc; letter-spacing: 0.5px;")
+        title_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #f0f6fc; letter-spacing: 0.3px;")
         header_bar.addWidget(title_label, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # footage metadata chips
-        self.chip_res = QLabel("No Footage Loaded")
-        self.chip_res.setStyleSheet(
-            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px; "
-            "padding: 4px 10px; color: #8b949e; font-size: 11px; font-weight: 600;"
+        # unified footage metadata chip
+        self.chip_footage = QLabel("No Footage Loaded")
+        self.chip_footage.setStyleSheet(
+            "background-color: #21252b; border: 1px solid #2e343d; border-radius: 4px; "
+            "padding: 3px 8px; color: #7f8a96; font-size: 11px; font-weight: 600;"
         )
-        header_bar.addWidget(self.chip_res, alignment=Qt.AlignmentFlag.AlignVCenter)
-
+        header_bar.addWidget(self.chip_footage, alignment=Qt.AlignmentFlag.AlignVCenter)
+        self.chip_res = self.chip_footage
         self.chip_fps = QLabel("")
         self.chip_fps.setVisible(False)
-        self.chip_fps.setStyleSheet(
-            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px; "
-            "padding: 4px 10px; color: #8b949e; font-size: 11px; font-weight: 600;"
-        )
-        header_bar.addWidget(self.chip_fps, alignment=Qt.AlignmentFlag.AlignVCenter)
-
         self.chip_duration = QLabel("")
         self.chip_duration.setVisible(False)
-        self.chip_duration.setStyleSheet(
-            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px; "
-            "padding: 4px 10px; color: #8b949e; font-size: 11px; font-weight: 600;"
-        )
-        header_bar.addWidget(self.chip_duration, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         header_bar.addStretch()
 
         vram_text = f"{self.gpu_profile.total_vram_gb} GB" if self.gpu_profile.is_cuda_available else "N/A"
-        self.gpu_badge = QLabel(f"GPU: {self.gpu_profile.name} ({vram_text})")
-        self.gpu_badge.setToolTip(f"Hardware Tier: {self.gpu_profile.tier_name}\nVRAM: {vram_text}")
+        short_gpu = self.gpu_profile.short_name
+        self.gpu_badge = QLabel(f"{short_gpu} ({vram_text})")
+        self.gpu_badge.setToolTip(f"GPU: {self.gpu_profile.name}\nTier: {self.gpu_profile.tier_name}\nVRAM: {vram_text}")
         self.gpu_badge.setStyleSheet(
-            "background-color: #161b22; border: 1px solid #30363d; border-radius: 4px; "
-            "padding: 4px 12px; color: #c9d1d9; font-size: 11.5px; font-weight: 600;"
+            "background-color: #21252b; border: 1px solid #2e343d; border-radius: 4px; "
+            "padding: 3px 10px; color: #b0bac5; font-size: 11px; font-weight: 600;"
         )
         header_bar.addWidget(self.gpu_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.open_output_btn = QPushButton("Output Folder")
-        self.open_output_btn.setFixedHeight(28)
+        self.open_output_btn.setFixedHeight(26)
         self.open_output_btn.setToolTip("Open folder containing exported keying outputs")
-        self.open_output_btn.setStyleSheet(
-            "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
-            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 500; } "
-            "QPushButton:hover { background-color: #21262d; border-color: #484f58; color: #ffffff; }"
-        )
         self.open_output_btn.clicked.connect(self._open_output_dir)
         header_bar.addWidget(self.open_output_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.settings_btn = QPushButton("Settings")
-        self.settings_btn.setFixedHeight(28)
+        self.settings_btn.setFixedHeight(26)
         self.settings_btn.setToolTip("Configure engine defaults, custom presets, and maintenance")
-        self.settings_btn.setStyleSheet(
-            "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
-            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 500; } "
-            "QPushButton:hover { background-color: #21262d; border-color: #484f58; color: #ffffff; }"
-        )
         self.settings_btn.clicked.connect(self._open_settings_dialog)
         header_bar.addWidget(self.settings_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         header_widget = QWidget()
         header_widget.setLayout(header_bar)
-        header_widget.setFixedHeight(34)
+        header_widget.setFixedHeight(32)
         main_layout.addWidget(header_widget)
 
         # update notification banner
@@ -470,13 +451,13 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet("QSplitter::handle { background-color: #161b22; width: 3px; }")
 
-        # left panel container
         left_panel = QWidget()
         left_panel.setObjectName("leftPanel")
-        left_panel.setFixedWidth(420)
+        left_panel.setMinimumWidth(330)
+        left_panel.setMaximumWidth(460)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(6)
 
         # left scrollable panel
         scroll_area = QScrollArea()
@@ -488,53 +469,44 @@ class MainWindow(QMainWindow):
         controls_widget = QWidget()
         controls_widget.setObjectName("controlsWidget")
         controls_layout = QVBoxLayout(controls_widget)
-        controls_layout.setContentsMargins(0, 0, 8, 0)
-        controls_layout.setSpacing(12)
+        controls_layout.setContentsMargins(0, 0, 4, 0)
+        controls_layout.setSpacing(8)
 
         # footage input box
-        input_group = QGroupBox("Input")
+        input_group = QGroupBox("Input Video")
         input_layout = QVBoxLayout(input_group)
+        input_layout.setSpacing(5)
         self.drop_area = QPushButton("Drop Video or Click to Browse")
-        self.drop_area.setFixedHeight(50)
+        self.drop_area.setFixedHeight(40)
         self.drop_area.setStyleSheet(
-            "QPushButton { border: 1px dashed #30363d; border-radius: 4px; "
-            "background-color: #161b22; color: #c9d1d9; font-size: 12px; font-weight: 500; } "
-            "QPushButton:hover { border-color: #484f58; background-color: #1c2128; color: #f0f6fc; }"
+            "QPushButton { border: 1px dashed #3a414c; border-radius: 4px; "
+            "background-color: #171a1e; color: #c4ccd6; font-size: 11.5px; font-weight: 500; } "
+            "QPushButton:hover { border-color: #4f5866; background-color: #1c2025; color: #ffffff; }"
         )
         self.drop_area.clicked.connect(self._browse_input)
         input_layout.addWidget(self.drop_area)
 
         self.input_label = QLabel("No file selected")
-        self.input_label.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.input_label.setStyleSheet("color: #7f8a96; font-size: 11px;")
         self.input_label.setWordWrap(True)
         input_layout.addWidget(self.input_label)
 
         self.companion_hint_label = QLabel("")
         self.companion_hint_label.setVisible(False)
-        self.companion_hint_label.setStyleSheet("color: #8b949e; font-size: 11px; font-weight: 500;")
+        self.companion_hint_label.setStyleSheet("color: #7f8a96; font-size: 11px; font-weight: 500;")
         self.companion_hint_label.setWordWrap(True)
         input_layout.addWidget(self.companion_hint_label)
 
-        controls_layout.addWidget(input_group)
-
-        # live resource budget banner
-        self.vram_banner = QFrame()
-        self.vram_banner.setStyleSheet(
-            "background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; padding: 6px 10px;"
+        self.vram_warning = QLabel("")
+        self.vram_warning.setWordWrap(True)
+        self.vram_warning.setVisible(False)
+        self.vram_warning.setStyleSheet(
+            "background-color: #272115; border: 1px solid #4a3a18; border-radius: 4px; "
+            "padding: 4px 8px; color: #e5b642; font-size: 11px; font-weight: 500;"
         )
-        vram_box = QVBoxLayout(self.vram_banner)
-        vram_box.setContentsMargins(0, 0, 0, 0)
-        vram_box.setSpacing(2)
-        self.vram_title = QLabel("VRAM: Calculating...")
-        self.vram_title.setWordWrap(True)
-        self.vram_title.setStyleSheet("font-weight: 500; color: #8b949e; font-size: 11.5px;")
-        self.vram_detail = QLabel("")
-        self.vram_detail.setStyleSheet("color: #8b949e; font-size: 11px;")
-        self.vram_detail.setWordWrap(True)
-        self.vram_detail.setVisible(False)
-        vram_box.addWidget(self.vram_title)
-        vram_box.addWidget(self.vram_detail)
-        controls_layout.addWidget(self.vram_banner)
+        input_layout.addWidget(self.vram_warning)
+
+        controls_layout.addWidget(input_group)
 
         # workflow presets
         preset_group = QGroupBox("Preset")
@@ -555,8 +527,11 @@ class MainWindow(QMainWindow):
         # guidance and despill
         guidance_group = QGroupBox("Keying and Despill")
         guidance_layout = QVBoxLayout(guidance_group)
+        guidance_layout.setSpacing(6)
 
-        guidance_layout.addWidget(QLabel("Guidance:"))
+        mode_row = QHBoxLayout()
+        lbl_mode = QLabel("Mode:")
+        lbl_mode.setStyleSheet("color: #9aa4b0; font-size: 11.5px; font-weight: 500;")
         self.mode_combo = QComboBox()
         self.mode_combo.addItems([
             "Auto",
@@ -564,7 +539,9 @@ class MainWindow(QMainWindow):
             "Video Mask Sequence",
         ])
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        guidance_layout.addWidget(self.mode_combo)
+        mode_row.addWidget(lbl_mode)
+        mode_row.addWidget(self.mode_combo, stretch=1)
+        guidance_layout.addLayout(mode_row)
 
         self.hint_btn = QPushButton("Select Mask File...")
         self.hint_btn.setVisible(False)
@@ -573,7 +550,7 @@ class MainWindow(QMainWindow):
 
         self.hint_label = QLabel("")
         self.hint_label.setVisible(False)
-        self.hint_label.setStyleSheet("color: #8b949e; font-size: 11px;")
+        self.hint_label.setStyleSheet("color: #7f8a96; font-size: 11px;")
         guidance_layout.addWidget(self.hint_label)
 
         # despill slider + spinbox
@@ -584,6 +561,7 @@ class MainWindow(QMainWindow):
         self.despill_spin.setRange(0.0, 1.0)
         self.despill_spin.setSingleStep(0.05)
         self.despill_spin.setValue(0.50)
+        self.despill_spin.setFixedWidth(56)
         self._sync_float_slider(self.despill_slider, self.despill_spin, 100.0)
         guidance_layout.addWidget(self._create_slider_param_row(
             "Despill Strength:", self.despill_slider, self.despill_spin, ""
@@ -594,6 +572,7 @@ class MainWindow(QMainWindow):
         # export deliverables
         export_group = QGroupBox("Output")
         export_layout = QVBoxLayout(export_group)
+        export_layout.setSpacing(6)
 
         self.deliverable_combo = QComboBox()
         self.deliverable_combo.addItems([
@@ -613,12 +592,12 @@ class MainWindow(QMainWindow):
         export_layout.addWidget(self.blender_script_check)
 
         out_row = QHBoxLayout()
-        self.outdir_label = QLabel("Output: ./outputs")
-        self.outdir_label.setStyleSheet("color: #8b949e; font-size: 11px; font-family: monospace;")
-        out_btn = QPushButton("Change...")
+        self.outdir_label = QLabel("Folder: ./outputs")
+        self.outdir_label.setStyleSheet("color: #7f8a96; font-size: 11px; font-family: monospace;")
+        self.outdir_label.setToolTip(str(self.output_dir))
+        out_btn = QPushButton("Browse...")
         out_btn.setFixedHeight(24)
         out_btn.clicked.connect(self._browse_output_dir)
-        row_out_btn = QHBoxLayout()
         out_row.addWidget(self.outdir_label, stretch=1)
         out_row.addWidget(out_btn)
         export_layout.addLayout(out_row)
@@ -630,10 +609,10 @@ class MainWindow(QMainWindow):
         self.advanced_toggle_btn.setCheckable(True)
         self.advanced_toggle_btn.setChecked(False)
         self.advanced_toggle_btn.setStyleSheet(
-            "QPushButton { background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; "
-            "padding: 8px 12px; font-weight: 500; color: #8b949e; text-align: left; } "
-            "QPushButton:hover { background-color: #161b22; border-color: #30363d; color: #c9d1d9; } "
-            "QPushButton:checked { background-color: #161b22; border-color: #364152; color: #f0f6fc; }"
+            "QPushButton { background-color: #21252b; border: 1px solid #2e343d; border-radius: 4px; "
+            "padding: 6px 10px; font-weight: 500; color: #88929e; text-align: left; } "
+            "QPushButton:hover { background-color: #282d35; color: #dce1e7; } "
+            "QPushButton:checked { background-color: #242930; border-color: #3b82f6; color: #ffffff; }"
         )
         self.advanced_toggle_btn.toggled.connect(self._on_toggle_advanced)
         controls_layout.addWidget(self.advanced_toggle_btn)
@@ -851,58 +830,58 @@ class MainWindow(QMainWindow):
 
         # action buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(4, 4, 4, 0)
+        btn_layout.setSpacing(6)
         self.start_btn = QPushButton("Start Keying")
-        self.start_btn.setFixedHeight(40)
+        self.start_btn.setFixedHeight(34)
         self.start_btn.setStyleSheet("""
             QPushButton {
-                background-color: #26354a;
-                color: #f0f6fc;
+                background-color: #2b5580;
+                color: #ffffff;
                 font-weight: 600;
-                padding: 8px 18px;
-                border: 1px solid #385175;
-                border-radius: 6px;
-                font-size: 13px;
+                padding: 6px 14px;
+                border: 1px solid #386ca3;
+                border-radius: 4px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #2d3f59;
-                border-color: #4a6a99;
-                color: #ffffff;
+                background-color: #336699;
+                border-color: #4682c4;
             }
             QPushButton:pressed {
-                background-color: #1e2b3c;
-                border-color: #26354a;
+                background-color: #224466;
             }
             QPushButton:disabled {
-                background-color: #161b22;
-                color: #484f58;
-                border: 1px solid #21262d;
+                background-color: #1a1d21;
+                color: #4e555e;
+                border: 1px solid #282d34;
             }
         """)
         self.start_btn.clicked.connect(self._start_keying)
         btn_layout.addWidget(self.start_btn, stretch=3)
 
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setFixedHeight(40)
+        self.cancel_btn.setFixedHeight(34)
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: #161b22;
-                color: #8b949e;
+                background-color: #261f21;
+                color: #b88686;
                 font-weight: 500;
-                padding: 8px 16px;
-                border: 1px solid #30363d;
-                border-radius: 6px;
-                font-size: 12px;
+                padding: 6px 12px;
+                border: 1px solid #3d2a2d;
+                border-radius: 4px;
+                font-size: 11.5px;
             }
             QPushButton:hover {
-                background-color: #21262d;
-                color: #f0f6fc;
-                border-color: #484f58;
+                background-color: #352528;
+                color: #e6a8a8;
+                border-color: #52383c;
             }
             QPushButton:disabled {
-                background-color: #0d1117;
-                color: #484f58;
-                border-color: #21262d;
+                background-color: #18191b;
+                color: #4e555e;
+                border-color: #24282d;
             }
         """)
         self.cancel_btn.clicked.connect(self._cancel_keying)
@@ -977,39 +956,18 @@ class MainWindow(QMainWindow):
         # sleek video playback transport bar
         playback_frame = QFrame()
         playback_frame.setStyleSheet(
-            "QFrame { background-color: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px 10px; }"
+            "QFrame { background-color: #21252b; border: 1px solid #2e343d; border-radius: 5px; padding: 4px 8px; }"
         )
         pb_layout = QVBoxLayout(playback_frame)
-        pb_layout.setContentsMargins(4, 4, 4, 4)
-        pb_layout.setSpacing(6)
+        pb_layout.setContentsMargins(4, 3, 4, 3)
+        pb_layout.setSpacing(4)
 
         # timeline scrubbing slider
         self.timeline_slider = QSlider(Qt.Orientation.Horizontal)
         self.timeline_slider.setRange(0, 0)
         self.timeline_slider.setValue(0)
         self.timeline_slider.setEnabled(False)
-        self.timeline_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 4px;
-                background: #21262d;
-                border-radius: 2px;
-            }
-            QSlider::sub-page:horizontal {
-                background: #385175;
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background: #8b949e;
-                border: 2px solid #0d1117;
-                width: 14px;
-                margin-top: -5px;
-                margin-bottom: -5px;
-                border-radius: 7px;
-            }
-            QSlider::handle:horizontal:hover {
-                background: #c9d1d9;
-            }
-        """)
+        self.timeline_slider.setFixedHeight(16)
         self.timeline_slider.sliderMoved.connect(self._on_timeline_scrubbed)
         self.timeline_slider.valueChanged.connect(self._on_timeline_scrubbed)
         pb_layout.addWidget(self.timeline_slider)
@@ -1017,30 +975,27 @@ class MainWindow(QMainWindow):
         # transport controls
         transport_layout = QHBoxLayout()
         transport_layout.setContentsMargins(0, 0, 0, 0)
-        transport_layout.setSpacing(6)
+        transport_layout.setSpacing(5)
 
         self.btn_step_prev = QPushButton("◀◀")
-        self.btn_step_prev.setFixedHeight(28)
-        self.btn_step_prev.setMinimumWidth(38)
+        self.btn_step_prev.setFixedSize(30, 24)
         self.btn_step_prev.setEnabled(False)
         self.btn_step_prev.clicked.connect(self._on_step_prev)
         transport_layout.addWidget(self.btn_step_prev)
 
         self.btn_play_pause = QPushButton("▶")
-        self.btn_play_pause.setFixedHeight(28)
-        self.btn_play_pause.setMinimumWidth(46)
+        self.btn_play_pause.setFixedSize(36, 24)
         self.btn_play_pause.setEnabled(False)
         self.btn_play_pause.setStyleSheet(
-            "QPushButton { background-color: #21262d; border: 1px solid #30363d; color: #f0f6fc; font-weight: 600; font-size: 13px; border-radius: 4px; } "
-            "QPushButton:hover { background-color: #30363d; color: #ffffff; border-color: #484f58; } "
-            "QPushButton:disabled { background-color: #161b22; color: #484f58; border-color: #21262d; }"
+            "QPushButton { background-color: #2b3036; border: 1px solid #3c444f; color: #f0f6fc; font-weight: 600; font-size: 11.5px; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #353c44; border-color: #4e5765; } "
+            "QPushButton:disabled { background-color: #1a1d21; color: #4e555e; border-color: #24282d; }"
         )
         self.btn_play_pause.clicked.connect(self._on_toggle_play_pause)
         transport_layout.addWidget(self.btn_play_pause)
 
         self.btn_step_next = QPushButton("▶▶")
-        self.btn_step_next.setFixedHeight(28)
-        self.btn_step_next.setMinimumWidth(38)
+        self.btn_step_next.setFixedSize(30, 24)
         self.btn_step_next.setEnabled(False)
         self.btn_step_next.clicked.connect(self._on_step_next)
         transport_layout.addWidget(self.btn_step_next)
@@ -1048,32 +1003,30 @@ class MainWindow(QMainWindow):
         self.btn_loop = QPushButton("Loop")
         self.btn_loop.setCheckable(True)
         self.btn_loop.setChecked(True)
-        self.btn_loop.setFixedHeight(28)
-        self.btn_loop.setMinimumWidth(52)
+        self.btn_loop.setFixedSize(44, 24)
         self.btn_loop.setStyleSheet(
-            "QPushButton { background-color: #161b22; color: #8b949e; border: 1px solid #30363d; padding: 2px 8px; font-size: 11px; font-weight: 600; } "
-            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #385175; }"
+            "QPushButton { background-color: #1e2227; color: #88929e; border: 1px solid #333942; padding: 2px 6px; font-size: 11px; font-weight: 600; } "
+            "QPushButton:checked { background-color: #2b3036; color: #f0f6fc; border-color: #3b82f6; }"
         )
         transport_layout.addWidget(self.btn_loop)
 
-        self.timecode_label = QLabel("00:00:00.00 / 00:00:00.00  [Frame 0 / 0]")
-        self.timecode_label.setStyleSheet("color: #8b949e; font-family: monospace; font-size: 11.5px; font-weight: 500; margin-left: 8px;")
+        self.timecode_label = QLabel("00:00.00 / 00:00.00 (0/0)")
+        self.timecode_label.setStyleSheet("color: #7f8a96; font-family: monospace; font-size: 11px; font-weight: 500; margin-left: 6px;")
         transport_layout.addWidget(self.timecode_label)
 
         transport_layout.addStretch()
 
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #8b949e; font-size: 11.5px;")
+        self.status_label.setStyleSheet("color: #7f8a96; font-size: 11px;")
         transport_layout.addWidget(self.status_label)
 
         self.btn_toggle_log = QPushButton("Log")
         self.btn_toggle_log.setCheckable(True)
         self.btn_toggle_log.setChecked(False)
-        self.btn_toggle_log.setFixedHeight(26)
-        self.btn_toggle_log.setMinimumWidth(46)
+        self.btn_toggle_log.setFixedSize(40, 24)
         self.btn_toggle_log.setStyleSheet(
-            "QPushButton { background-color: #161b22; color: #8b949e; border: 1px solid #30363d; font-size: 11px; font-weight: 600; } "
-            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #385175; }"
+            "QPushButton { background-color: #1e2227; color: #88929e; border: 1px solid #333942; font-size: 11px; font-weight: 600; } "
+            "QPushButton:checked { background-color: #2b3036; color: #f0f6fc; border-color: #3b82f6; }"
         )
         self.btn_toggle_log.toggled.connect(self._on_toggle_log)
         transport_layout.addWidget(self.btn_toggle_log)
@@ -1085,12 +1038,12 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setFixedHeight(6)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setVisible(False)
         self.progress_bar.setStyleSheet("""
-            QProgressBar { background-color: #0b0e14; border: 1px solid #21262d; border-radius: 4px; }
-            QProgressBar::chunk { background-color: #385175; border-radius: 3px; }
+            QProgressBar { background-color: #171a1e; border: 1px solid #2e343d; border-radius: 3px; }
+            QProgressBar::chunk { background-color: #3b82f6; border-radius: 2px; }
         """)
         right_layout.addWidget(self.progress_bar)
 
@@ -1103,21 +1056,24 @@ class MainWindow(QMainWindow):
 
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setFixedHeight(110)
+        self.log_text.setFixedHeight(85)
         self.log_text.setStyleSheet(
-            "background-color: #0d1117; color: #8b949e; font-family: monospace; font-size: 11px; "
-            "border: 1px solid #21262d; border-radius: 5px;"
+            "background-color: #171a1e; color: #88929e; font-family: monospace; font-size: 10.5px; "
+            "border: 1px solid #2e343d; border-radius: 4px;"
         )
         lc_layout.addWidget(self.log_text)
         right_layout.addWidget(self.log_container)
 
         splitter.addWidget(right_widget)
+        splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        splitter.setSizes([350, 830])
 
         main_layout.addWidget(splitter, stretch=1)
 
         self.setAcceptDrops(True)
-        self.output_dir = Path("./outputs").resolve()
 
     def _sync_float_slider(self, slider: QSlider, spinbox: QDoubleSpinBox, factor: float):
         spinbox.valueChanged.connect(lambda val: slider.setValue(int(round(val * factor))))
@@ -1258,7 +1214,8 @@ class MainWindow(QMainWindow):
             self.blender_script_check.setChecked(bool(data["blender_script"]))
         if "output_dir" in data:
             self.output_dir = Path(data["output_dir"]).resolve()
-            self.outdir_label.setText(f"Output: {self.output_dir}")
+            self.outdir_label.setText(f"Folder: {self.output_dir.name}")
+            self.outdir_label.setToolTip(str(self.output_dir))
 
         self._update_vram_budget()
 
@@ -1400,24 +1357,12 @@ class MainWindow(QMainWindow):
         peak_est = self._get_current_vram_estimate()
         avail = self.gpu_profile.total_vram_gb
         is_safe = (avail == 0) or (peak_est <= avail)
-        mode_str = "Staged Memory" if self.low_vram_check.isChecked() else "Direct VRAM"
 
-        if is_safe:
-            self.vram_banner.setStyleSheet(
-                "background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; padding: 6px 10px;"
-            )
-            self.vram_title.setText(f"VRAM: ~{peak_est} GB / {avail} GB ({mode_str})")
-            self.vram_title.setStyleSheet("font-weight: 500; color: #8b949e; font-size: 11.5px;")
-            self.vram_detail.setVisible(False)
+        if self.selected_input is not None and not is_safe and not self.low_vram_check.isChecked():
+            self.vram_warning.setText(f"Warning: High VRAM load (~{peak_est} GB / {avail} GB). Low-VRAM mode recommended.")
+            self.vram_warning.setVisible(True)
         else:
-            self.vram_banner.setStyleSheet(
-                "background-color: #191410; border: 1px solid #3d2d1d; border-radius: 4px; padding: 6px 10px;"
-            )
-            self.vram_title.setText(f"VRAM: ~{peak_est} GB / {avail} GB (High Load)")
-            self.vram_title.setStyleSheet("font-weight: 500; color: #d29922; font-size: 11.5px;")
-            self.vram_detail.setText("Exceeds dedicated VRAM. Enable Low-VRAM if needed.")
-            self.vram_detail.setStyleSheet("color: #d29922; font-size: 11px;")
-            self.vram_detail.setVisible(True)
+            self.vram_warning.setVisible(False)
 
     def _browse_input(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1458,11 +1403,11 @@ class MainWindow(QMainWindow):
         self.clip_fps = float(self.cap_orig.get(cv2.CAP_PROP_FPS)) or 24.0
 
         dur_sec = round(self.clip_frames / max(1.0, self.clip_fps), 1)
-        self.chip_res.setText(f"{self.clip_width}x{self.clip_height}")
-        self.chip_fps.setText(f"{round(self.clip_fps, 2)} fps")
-        self.chip_fps.setVisible(True)
-        self.chip_duration.setText(f"{dur_sec}s ({self.clip_frames}f)")
-        self.chip_duration.setVisible(True)
+        self.chip_footage.setText(f"{self.clip_width}x{self.clip_height} · {self.clip_fps:.2f} fps · {dur_sec}s ({self.clip_frames}f)")
+        self.chip_footage.setStyleSheet(
+            "background-color: #1e2630; border: 1px solid #314a6d; border-radius: 4px; "
+            "padding: 3px 8px; color: #d0dbe6; font-size: 11px; font-weight: 600;"
+        )
 
         self.current_frame_idx = 0
         self.timeline_slider.setRange(0, max(0, self.clip_frames - 1))
@@ -1587,7 +1532,7 @@ class MainWindow(QMainWindow):
         cur_str = f"{int(cur_sec//60):02d}:{int(cur_sec%60):02d}.{int((cur_sec%1)*100):02d}"
         tot_str = f"{int(tot_sec//60):02d}:{int(tot_sec%60):02d}.{int((tot_sec%1)*100):02d}"
         self.timecode_label.setText(
-            f"{cur_str} / {tot_str}  [Frame {self.current_frame_idx + 1} / {self.clip_frames}]"
+            f"{cur_str} / {tot_str} ({self.current_frame_idx + 1}/{self.clip_frames})"
         )
 
     def _on_toggle_play_pause(self):
@@ -1867,8 +1812,8 @@ class MainWindow(QMainWindow):
                 "background-color: #1b2636; color: #8b949e; font-size: 11px; font-weight: 600; "
                 "padding: 2px 6px; border-radius: 3px; border: 1px solid #26354a;"
             )
-            self.update_label.setText("Update installed. Restart application.")
-            self.btn_update_now.setText("Restart")
+            self.update_label.setText("Update installed. Restarting...")
+            self.btn_update_now.setText("Restarting...")
             self.btn_update_now.setEnabled(True)
             try:
                 self.btn_update_now.clicked.disconnect()
@@ -1877,6 +1822,7 @@ class MainWindow(QMainWindow):
             self.btn_update_now.clicked.connect(self._restart_app)
             self.btn_update_dismiss.setText("Later")
             self.btn_update_dismiss.setEnabled(True)
+            QTimer.singleShot(1500, self._restart_app)
         else:
             self.update_progress_bar.setVisible(False)
             self.update_badge.setText("ERROR")

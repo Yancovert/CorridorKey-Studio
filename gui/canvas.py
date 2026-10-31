@@ -32,6 +32,7 @@ class PreviewCanvas(QWidget):
         self._pan_offset: QPointF = QPointF(0, 0)
         self._is_panning: bool = False
         self._last_mouse_pos: QPointF = QPointF(0, 0)
+        self._target_rect: QRectF = QRectF(0, 0, 0, 0)
 
     def set_frames(self, original_pixmap: QPixmap | None, result_pixmap: QPixmap | None):
         self._pixmap_original = original_pixmap
@@ -90,11 +91,20 @@ class PreviewCanvas(QWidget):
             return
 
         if self._view_mode == "split" and event.button() == Qt.MouseButton.LeftButton:
-            x_norm = event.position().x() / max(1, self.width())
-            if abs(x_norm - self._split_ratio) < 0.05:
-                self._is_dragging_split = True
-                event.accept()
-                return
+            if self._target_rect.width() > 0:
+                split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio
+                if abs(event.position().x() - split_x) <= 12:
+                    self._is_dragging_split = True
+                    event.accept()
+                    return
+                elif self._target_rect.contains(event.position()):
+                    # click anywhere inside video to jump split line
+                    ratio = (event.position().x() - self._target_rect.x()) / self._target_rect.width()
+                    self._split_ratio = max(0.0, min(1.0, ratio))
+                    self._is_dragging_split = True
+                    self.update()
+                    event.accept()
+                    return
 
         super().mousePressEvent(event)
 
@@ -108,16 +118,19 @@ class PreviewCanvas(QWidget):
             return
 
         if self._is_dragging_split:
-            self._split_ratio = max(0.05, min(0.95, event.position().x() / max(1, self.width())))
-            self.update()
-            event.accept()
-            return
+            if self._target_rect.width() > 0:
+                ratio = (event.position().x() - self._target_rect.x()) / self._target_rect.width()
+                self._split_ratio = max(0.0, min(1.0, ratio))
+                self.update()
+                event.accept()
+                return
         elif self._view_mode == "split":
-            x_norm = event.position().x() / max(1, self.width())
-            if abs(x_norm - self._split_ratio) < 0.05:
-                self.setCursor(Qt.CursorShape.SplitHCursor)
-            else:
-                self.setCursor(Qt.CursorShape.ArrowCursor)
+            if self._target_rect.width() > 0:
+                split_x = self._target_rect.x() + self._target_rect.width() * self._split_ratio
+                if abs(event.position().x() - split_x) <= 12 and self._target_rect.top() <= event.position().y() <= self._target_rect.bottom():
+                    self.setCursor(Qt.CursorShape.SplitHCursor)
+                else:
+                    self.setCursor(Qt.CursorShape.ArrowCursor)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -128,16 +141,19 @@ class PreviewCanvas(QWidget):
             return
         if self._is_dragging_split:
             self._is_dragging_split = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
             event.accept()
             return
         super().mouseReleaseEvent(event)
 
     def _draw_checkerboard(self, painter: QPainter, rect: QRectF):
-        cell_size = 16
-        c1 = QColor(36, 40, 46)
-        c2 = QColor(48, 54, 62)
-        cols = int(rect.width() // cell_size) + 2
-        rows = int(rect.height() // cell_size) + 2
+        cell_size = 14
+        c1 = QColor(28, 32, 38)
+        c2 = QColor(38, 44, 52)
+        painter.save()
+        painter.setClipRect(rect)
+        cols = int(rect.width() // cell_size) + 3
+        rows = int(rect.height() // cell_size) + 3
         for r in range(rows):
             for c in range(cols):
                 color = c1 if (r + c) % 2 == 0 else c2
@@ -145,6 +161,7 @@ class PreviewCanvas(QWidget):
                     QRectF(rect.x() + c * cell_size, rect.y() + r * cell_size, cell_size, cell_size),
                     color
                 )
+        painter.restore()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -164,12 +181,27 @@ class PreviewCanvas(QWidget):
         )
 
         if ref_pixmap is None:
+            self._target_rect = QRectF(0, 0, 0, 0)
+            box_w = min(400, max(260, w - 40))
+            box_h = 90
+            box_rect = QRectF((w - box_w) / 2, (h - box_h) / 2, box_w, box_h)
+
+            painter.setPen(QPen(QColor(45, 52, 60), 1, Qt.PenStyle.DashLine))
+            painter.setBrush(QBrush(QColor(22, 26, 30)))
+            painter.drawRoundedRect(box_rect, 6, 6)
+
             font = painter.font()
-            font.setPointSize(12)
+            font.setPointSize(11)
             font.setBold(True)
             painter.setFont(font)
-            painter.setPen(QColor(139, 148, 158))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._status_text)
+            painter.setPen(QColor(200, 206, 214))
+            painter.drawText(QRectF(box_rect.x(), box_rect.y() + 20, box_rect.width(), 24), Qt.AlignmentFlag.AlignCenter, "Drop video here to inspect")
+
+            font.setPointSize(10)
+            font.setBold(False)
+            painter.setFont(font)
+            painter.setPen(QColor(120, 128, 138))
+            painter.drawText(QRectF(box_rect.x(), box_rect.y() + 48, box_rect.width(), 20), Qt.AlignmentFlag.AlignCenter, "Supports MP4, MOV, MKV, WebM, AVI")
             return
 
         # fit inside canvas keeping aspect ratio and apply zoom / pan
@@ -178,7 +210,8 @@ class PreviewCanvas(QWidget):
         h_scaled = base_size.height() * self._zoom_scale
         x = (w - w_scaled) / 2 + self._pan_offset.x()
         y = (h - h_scaled) / 2 + self._pan_offset.y()
-        target_rect = QRectF(x, y, w_scaled, h_scaled)
+        self._target_rect = QRectF(x, y, w_scaled, h_scaled)
+        target_rect = self._target_rect
 
         pm_orig = self._pixmaps.get("original") or self._pixmap_original
         pm_cutout = self._pixmaps.get("cutout") or self._pixmap_result
@@ -212,7 +245,7 @@ class PreviewCanvas(QWidget):
 
         elif self._view_mode == "split":
             split_x = target_rect.x() + target_rect.width() * self._split_ratio
-            right_width = target_rect.x() + target_rect.width() - split_x
+            right_width = target_rect.right() - split_x
 
             # checkerboard background strictly under transparent right side
             if right_width > 0:
@@ -233,16 +266,24 @@ class PreviewCanvas(QWidget):
                 painter.setClipRect(QRectF(split_x, target_rect.y(), right_width, target_rect.height()))
                 painter.drawPixmap(target_rect.toRect(), res_to_draw)
                 painter.restore()
+            elif not res_to_draw and right_width > 0:
+                painter.save()
+                font = painter.font()
+                font.setPointSize(10)
+                painter.setFont(font)
+                painter.setPen(QColor(160, 168, 178, 180))
+                painter.drawText(QRectF(split_x, target_rect.y(), right_width, target_rect.height()), Qt.AlignmentFlag.AlignCenter, "Cutout Preview\n(Run keying to generate)")
+                painter.restore()
 
             # draw divider line
             painter.setPen(QPen(QColor(230, 235, 245), 2))
-            painter.drawLine(QPointF(split_x, target_rect.y()), QPointF(split_x, target_rect.y() + target_rect.height()))
+            painter.drawLine(QPointF(split_x, target_rect.y()), QPointF(split_x, target_rect.bottom()))
 
             # divider handle indicator
             center_y = target_rect.y() + target_rect.height() / 2
-            painter.setBrush(QBrush(QColor(230, 235, 245)))
-            painter.setPen(QPen(QColor(36, 40, 46), 1))
-            painter.drawEllipse(QPointF(split_x, center_y), 4, 4)
+            painter.setBrush(QBrush(QColor(240, 244, 250)))
+            painter.setPen(QPen(QColor(30, 34, 40), 1.5))
+            painter.drawEllipse(QPointF(split_x, center_y), 5, 5)
         else:
             if pm_cutout:
                 self._draw_checkerboard(painter, target_rect)

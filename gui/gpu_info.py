@@ -22,6 +22,12 @@ class GpuProfile:
     tier_name: str
     tier_desc: str
 
+    @property
+    def short_name(self) -> str:
+        s = self.name.replace("NVIDIA GeForce ", "").replace("NVIDIA ", "")
+        s = s.replace(" Laptop GPU", " Laptop").replace(" GPU", "")
+        return s.strip()
+
 
 # Peak GPU memory in GiB by megapixels of model input, measured at each Hann
 # chunk size from CorridorKey 2.0 empirical benchmarks.
