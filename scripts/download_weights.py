@@ -46,25 +46,26 @@ def _md5_b64(path: Path) -> str:
     return base64.b64encode(digest.digest()).decode()
 
 
-def download_corridorkey(root: Path, repo: str, revision: str | None) -> None:
+def download_corridorkey(root: Path, repo: str, revision: str | None, token: str | bool = False) -> None:
     for name in CORRIDORKEY_FILES:
         print(f"[corridorkey] {name}")
-        hf_hub_download(repo, name, revision=revision, local_dir=root / "weights")
+        hf_hub_download(repo, name, revision=revision, local_dir=root / "weights", token=token)
 
 
-def download_cradio(root: Path) -> None:
+def download_cradio(root: Path, token: str | bool = False) -> None:
     print(f"[c-radio] {CRADIO_REPO}@{CRADIO_REVISION[:7]}")
     snapshot_download(
         CRADIO_REPO, revision=CRADIO_REVISION,
         local_dir=root / "vfms/cradio/C-RADIOv4-SO400M",
-        # The half-precision .pth.tar duplicates model.safetensors and is unused.
+        # the half-precision .pth.tar duplicates model.safetensors and is unused
         ignore_patterns=["*.pth.tar"],
+        token=token,
     )
 
 
-def download_moge(root: Path) -> None:
+def download_moge(root: Path, token: str | bool = False) -> None:
     print(f"[moge] {MOGE_REPO}@{MOGE_REVISION[:7]}")
-    hf_hub_download(MOGE_REPO, "model.pt", revision=MOGE_REVISION, local_dir=root / "vfms/moge")
+    hf_hub_download(MOGE_REPO, "model.pt", revision=MOGE_REVISION, local_dir=root / "vfms/moge", token=token)
 
 
 def download_rvm(root: Path) -> None:
@@ -90,13 +91,16 @@ def main():
     ap.add_argument("--corridorkey_revision", default=None)
     ap.add_argument("--skip_corridorkey", action="store_true",
                     help="Only fetch the third-party foundation models.")
+    ap.add_argument("--hf_token", default=None,
+                    help="Optional Hugging Face access token. Defaults to unauthenticated for public models.")
     args = ap.parse_args()
 
+    token = args.hf_token if args.hf_token else False
     root = Path(args.package_root).resolve()
     if not args.skip_corridorkey:
-        download_corridorkey(root, args.corridorkey_repo, args.corridorkey_revision)
-    download_cradio(root)
-    download_moge(root)
+        download_corridorkey(root, args.corridorkey_repo, args.corridorkey_revision, token=token)
+    download_cradio(root, token=token)
+    download_moge(root, token=token)
     download_rvm(root)
     print(f"All assets are in place under {root}")
 

@@ -1,0 +1,1 @@
+"""corridorkey studio desktop application."""
