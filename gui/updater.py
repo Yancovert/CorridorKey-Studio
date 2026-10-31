@@ -87,6 +87,10 @@ class UpdateInstallWorker(QThread):
         with tempfile.TemporaryDirectory() as tmp_dir:
             zip_path = Path(tmp_dir) / "update.zip"
 
+            opener = urllib.request.build_opener()
+            opener.addheaders = [("User-Agent", "CorridorKey-Studio/2.1.0")]
+            urllib.request.install_opener(opener)
+
             def _dl_hook(blocks_done: int, block_size: int, total_size: int):
                 if total_size > 0:
                     downloaded = blocks_done * block_size

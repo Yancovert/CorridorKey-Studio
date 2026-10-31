@@ -243,6 +243,7 @@ class MainWindow(QMainWindow):
 
         vram_text = f"{self.gpu_profile.total_vram_gb} GB" if self.gpu_profile.is_cuda_available else "N/A"
         self.gpu_badge = QLabel(f"GPU: {self.gpu_profile.name} ({vram_text})")
+        self.gpu_badge.setToolTip(f"Hardware Tier: {self.gpu_profile.tier_name}\nVRAM: {vram_text}")
         self.gpu_badge.setStyleSheet(
             "background-color: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 4px; "
             "padding: 4px 10px; color: #888888; font-size: 11px;"
@@ -251,6 +252,7 @@ class MainWindow(QMainWindow):
 
         self.open_output_btn = QPushButton("Open Outputs Folder")
         self.open_output_btn.setFixedHeight(26)
+        self.open_output_btn.setToolTip("Open folder containing exported keying outputs")
         self.open_output_btn.setStyleSheet(
             "QPushButton { background-color: #121212; color: #bbbbbb; border: 1px solid #222222; "
             "padding: 2px 10px; border-radius: 3px; font-size: 11px; } "
