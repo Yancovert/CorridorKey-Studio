@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CorridorKey Studio - green screen tool for blender</title>
+  <style>
+    body {
+      background: #141414;
+      color: #dcdcdc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
+      margin: 0;
+      padding: 30px 20px 60px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.6rem;
+      color: #ffffff;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .tagline {
+      color: #888888;
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+    .box {
+      background: #1e1e1e;
+      border: 1px solid #333333;
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+    .download-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 14px 0 6px;
+    }
+    .btn {
+      display: inline-block;
+      background: #2b5c3b;
+      color: #ffffff;
+      padding: 9px 16px;
+      border-radius: 3px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid #3c7d52;
+    }
+    .btn:hover {
+      background: #347248;
+    }
+    .btn-secondary {
+      background: #282828;
+      border-color: #444444;
+      color: #cccccc;
+    }
+    .btn-secondary:hover {
+      background: #333333;
+    }
+    h2 {
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin: 28px 0 10px;
+      border-bottom: 1px solid #2a2a2a;
+      padding-bottom: 4px;
+    }
+    p {
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+      color: #bbbbbb;
+    }
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 16px;
+      color: #bbbbbb;
+      font-size: 0.95rem;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    code, pre {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.88rem;
+      background: #0a0a0a;
+      color: #9cdcfe;
+    }
+    code {
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    pre {
+      padding: 10px 14px;
+      border: 1px solid #222222;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 12px 0 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 12px 0 18px;
+    }
+    th, td {
+      border: 1px solid #2e2e2e;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: #1a1a1a;
+      color: #ffffff;
+    }
+    td:first-child {
+      color: #888888;
+      width: 140px;
+    }
+    a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 14px;
+      border-top: 1px solid #222222;
+      font-size: 0.82rem;
+      color: #666666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CorridorKey Studio</h1>
+    <div class="tagline">simple desktop tool for CorridorKey 2.0 green screen cutouts</div>
+
+    <div class="box">
+      <strong>Get the installer:</strong>
+      <div class="download-row">
+        <a href="install.sh" download="install.sh" class="btn">Download install.sh (Linux)</a>
+        <a href="install.bat" download="install.bat" class="btn btn-secondary">Download install.bat (Windows)</a>
+      </div>
+      <p style="margin-top: 10px; font-size: 0.85rem; color: #888888; margin-bottom: 0;">
+        Or clone and run directly:
+      </p>
+      <pre>git clone -b app https://github.com/Yancovert/CorridorKey-Studio.git
+cd CorridorKey-Studio
+./install.sh</pre>
+    </div>
+
+    <h2>What is this?</h2>
+    <p>
+      Corridor Digital recently made their CorridorKey 2.0 model open source on GitHub. It pulls clean green and blue screen mattes using neural networks without cutting off hair, motion blur, or semi-transparent edges.
+    </p>
+    <p>
+      The catch is that the repo only comes with python terminal scripts. If you just want to key a video for a 3D scene in Blender, typing long command line arguments every single time gets tedious fast.
+    </p>
+    <p>
+      This is a simple desktop app wrapper around it. You get a basic window with:
+    </p>
+    <ul>
+      <li>Drag and drop support for MP4, MOV, and image sequences.</li>
+      <li>Side-by-side split slider to preview original footage vs. transparent cutouts.</li>
+      <li>Automatic memory tuning so smaller 4GB cards don't crash with CUDA out-of-memory errors.</li>
+      <li>One-click Blender export presets (transparent ProRes 4444, PNG sequences, and an auto-generated Blender compositor script).</li>
+    </ul>
+
+    <h2>Quick install guide</h2>
+    <ol>
+      <li>Download either <code>install.sh</code> (Linux) or <code>install.bat</code> (Windows).</li>
+      <li>Run it. It checks for Python, sets up a virtualenv, installs PyTorch with CUDA, and downloads the model weights (about 5 GB).</li>
+      <li>A simple setup window will pop up asking where you want to install it and store cache files.</li>
+      <li>Once finished, launch the app with <code>./launch_gui.sh</code> (Linux) or <code>launch_gui.bat</code> (Windows).</li>
+    </ol>
+
+    <h2>Hardware notes</h2>
+    <table>
+      <tr>
+        <td>GPU</td>
+        <td>NVIDIA RTX card with CUDA (tested on RTX 3050 mobile, 3060, 40-series).</td>
+      </tr>
+      <tr>
+        <td>VRAM</td>
+        <td>4 GB minimum. The app auto-detects 4GB cards and switches to staged low-VRAM mode with small frame chunks so 1080p and 4K footage don't crash.</td>
+      </tr>
+      <tr>
+        <td>Other</td>
+        <td><code>ffmpeg</code> must be installed on your system.</td>
+      </tr>
+    </table>
+
+    <h2>Blender workflow</h2>
+    <p>
+      In the app, pick one of the Blender presets:
+    </p>
+    <ul>
+      <li><strong>ProRes 4444 RGBA:</strong> Exports a single transparent video file that drops right into Blender's compositor or video sequencer.</li>
+      <li><strong>PNG Sequence:</strong> Exports numbered transparent frames, handy for mapping onto 3D planes/cards in Cycles and Eevee.</li>
+      <li><strong>OpenEXR:</strong> 32-bit linear floating point frames for VFX lighting integration.</li>
+    </ul>
+    <p>
+      If you leave "Auto-Generate Blender Compositor Script" checked, it drops a small <code>import_to_blender.py</code> script next to your output video. Running that script inside Blender automatically sets up the compositor node graph for you.
+    </p>
+
+    <div class="footer">
+      Based on CorridorKey 2.0 by Zachary Harris, Niko Pueringer, and Corridor Digital.
+      <br>
+      Source code and updates on <a href="https://github.com/Yancovert/CorridorKey-Studio">GitHub</a>.
+    </div>
+  </div>
+</body>
+</html>
