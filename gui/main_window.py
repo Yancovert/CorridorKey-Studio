@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Corridorkey Studio")
         self.resize(1360, 920)
         self.setMinimumSize(1020, 680)
+        self.app_root = Path(__file__).resolve().parents[1]
 
         icon_path = Path(__file__).resolve().parent / "icon.png"
         if icon_path.exists():
