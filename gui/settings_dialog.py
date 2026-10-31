@@ -365,6 +365,15 @@ class SettingsDialog(QDialog):
         maint_layout.addWidget(lbl_app_path)
 
         maint_row = QHBoxLayout()
+        btn_patchnotes = QPushButton("View Patch Notes...")
+        btn_patchnotes.setStyleSheet(
+            "QPushButton { background-color: #1c2128; color: #58a6ff; border: 1px solid #30363d; "
+            "padding: 5px 14px; font-weight: 500; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #262c36; border-color: #58a6ff; color: #f0f6fc; }"
+        )
+        btn_patchnotes.clicked.connect(self._on_click_view_patchnotes)
+        maint_row.addWidget(btn_patchnotes)
+
         btn_uninstall = QPushButton("Uninstall...")
         btn_uninstall.setStyleSheet(
             "QPushButton { background-color: #1a1616; color: #c98888; border: 1px solid #3d2626; "
@@ -465,10 +474,11 @@ class SettingsDialog(QDialog):
         self.lbl_outdir.setText(str(state.get("output_dir", "./outputs")))
 
     def _collect_current_dict(self) -> dict:
+        d = dict(self.current_state)
         gpu_id = "auto"
         if hasattr(self, "combo_gpu") and self.combo_gpu.currentData():
             gpu_id = self.combo_gpu.currentData().get("id", "auto")
-        return {
+        d.update({
             "selected_gpu": gpu_id,
             "low_vram": self.chk_low_vram.isChecked(),
             "scale": round(self.spin_scale.value(), 2),
@@ -486,7 +496,8 @@ class SettingsDialog(QDialog):
             "deliverable": self.combo_deliverable.currentText(),
             "blender_script": self.chk_blender_script.isChecked(),
             "output_dir": self.lbl_outdir.text(),
-        }
+        })
+        return d
 
     def _browse_output_dir(self):
         cur = self.lbl_outdir.text()
@@ -564,6 +575,12 @@ class SettingsDialog(QDialog):
             self.accept()
         else:
             QMessageBox.critical(self, "Error", "Failed to write default settings file.")
+
+    def _on_click_view_patchnotes(self):
+        from .patchnotes_dialog import PatchNotesDialog, get_installed_version
+        v = get_installed_version(self.app_root)
+        dlg = PatchNotesDialog(self, self.app_root, current_version=v)
+        dlg.exec()
 
     def _on_click_uninstall(self):
         reply = QMessageBox.warning(
