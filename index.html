@@ -144,15 +144,18 @@
     <div class="box">
       <strong>Get the installer:</strong>
       <div class="download-row">
-        <a href="install.sh" download="install.sh" class="btn">Download install.sh (Linux)</a>
-        <a href="install.bat" download="install.bat" class="btn btn-secondary">Download install.bat (Windows)</a>
+        <a href="CorridorKey-Studio-Installer-Linux" download="CorridorKey-Studio-Installer-Linux" class="btn">Download for Linux (Installer)</a>
+        <a href="CorridorKey-Studio-Setup.exe" download="CorridorKey-Studio-Setup.exe" class="btn btn-secondary">Download for Windows (.exe)</a>
       </div>
       <p style="margin-top: 10px; font-size: 0.85rem; color: #888888; margin-bottom: 0;">
-        Or clone and run directly:
+        Or clone and run the dedicated platform branch:
       </p>
-      <pre>git clone -b app https://github.com/Yancovert/CorridorKey-Studio.git
-cd CorridorKey-Studio
-./install.sh</pre>
+      <pre># Linux:
+git clone -b app-linux https://github.com/Yancovert/CorridorKey-Studio.git
+cd CorridorKey-Studio && ./CorridorKey-Studio-Installer-Linux
+
+# Windows:
+git clone -b app-win https://github.com/Yancovert/CorridorKey-Studio.git</pre>
     </div>
 
     <h2>What is this?</h2>
@@ -174,10 +177,9 @@ cd CorridorKey-Studio
 
     <h2>Quick install guide</h2>
     <ol>
-      <li>Download either <code>install.sh</code> (Linux) or <code>install.bat</code> (Windows).</li>
-      <li>Run it. It checks for Python, sets up a virtualenv, installs PyTorch with CUDA, and downloads the model weights (about 5 GB).</li>
-      <li>A simple setup window will pop up asking where you want to install it and store cache files.</li>
-      <li>Once finished, launch the app with <code>./launch_gui.sh</code> (Linux) or <code>launch_gui.bat</code> (Windows).</li>
+      <li>Download the installer for your OS (<code>CorridorKey-Studio-Installer-Linux</code> or <code>CorridorKey-Studio-Setup.exe</code>).</li>
+      <li>Run it. The installer checks your GPU, auto-detects the drive with the most free space for weights, sets up dependencies, and creates a desktop shortcut.</li>
+      <li>Once finished, launch the app directly or via <code>./launch_gui.sh</code> (Linux) / <code>launch_gui.bat</code> (Windows).</li>
     </ol>
 
     <h2>Hardware notes</h2>
