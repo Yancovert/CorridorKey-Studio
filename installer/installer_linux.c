@@ -13,7 +13,7 @@
 
 #include "payload_data.h"
 
-#define BUNDLED_COMMIT "182b641"
+#define BUNDLED_COMMIT "cd81a4d"
 #define BUNDLED_BRANCH "app-linux"
 
 typedef enum {
