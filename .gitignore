@@ -24,7 +24,11 @@ vfms/**
 
 # Outputs & Temporary Files
 out*/
+outputs
 tmp/
+videos
+build/
+*.spec
 *.mov
 *.mp4
 *.exr
@@ -33,7 +37,21 @@ tmp/
 *.jpeg
 *.f16
 *.f32
+screenshot_*.png
+!gui/icon.png
+!screenshot.png
+!installer/icon.ico
 
 # Local / studio-specific files
 path_mappings.json
 .claude/
+project.md
+GEMINI.md
+gemini.md
+AGENTS.md
+agents.md
+.agent/
+.agents/
+.gemini/
+scratch/
+

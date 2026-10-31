@@ -250,7 +250,7 @@ def load_model(paths: RuntimePaths, device: str = "cuda") -> CorridorKeyV3:
     cfg["device"] = device
     cfg["stage1_recurrent_64_sites"] = ()
 
-    print(f"Loading CorridorKey v2 runtime weights: {paths.weights}")
+    print(f"Loading CorridorKey v2 runtime weights: {paths.weights}", flush=True)
     model = CorridorKeyV3(**cfg)
     missing, unexpected = model.load_state_dict(ckpt["state_dict"], strict=False)
     train_missing = [k for k in missing if not k.startswith("foundations.")]
@@ -259,7 +259,7 @@ def load_model(paths: RuntimePaths, device: str = "cuda") -> CorridorKeyV3:
         raise RuntimeError(
             "runtime checkpoint did not match model: "
             f"missing={train_missing[:8]} unexpected={train_unexpected[:8]}")
-    print(f"  loaded weights; omitted frozen foundation tensors={len(missing)}")
+    print(f"  loaded weights; omitted frozen foundation tensors={len(missing)}", flush=True)
     model.eval()
     del ckpt
     return model
@@ -310,7 +310,7 @@ def precompute_rvm_to_memmap(model, source, meta, rvm_path: Path,
     D = model.foundations.rvm.embed_dim
     h_e, w_e = H_e // 16, W_e // 16
     print(f"    RVM continuous prepass: T={T_all}, chunk={chunk}, "
-          f"input={W_e}x{H_e}, grid={w_e}x{h_e}")
+          f"input={W_e}x{H_e}, grid={w_e}x{h_e}", flush=True)
     out = np.memmap(rvm_path, dtype=np.float16, mode="w+",
                     shape=(T_all, D, h_e, w_e))
     mean = model.foundations.rvm_mean.view(1, 1, -1, 1, 1).float().cpu()
@@ -367,7 +367,7 @@ def precompute_foundations_to_memmap(model, source, meta, prefix: Path,
         paths["cradio_shape"] = (T_all, C_cradio, h64, w64)
         cradio_out = np.memmap(paths["cradio"], dtype=np.float32, mode="w+",
                                shape=paths["cradio_shape"])
-    print(f"    frozen VFM prepass: T={T_all}, grid={w64}x{h64}, chunk={chunk}")
+    print(f"    frozen VFM prepass: T={T_all}, grid={w64}x{h64}, chunk={chunk}", flush=True)
     if reader_kind == "video":
         chunks = iter_video_frame_chunks(str(source), meta, chunk_size=chunk, need_model=False)
     else:

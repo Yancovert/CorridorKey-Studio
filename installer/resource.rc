@@ -1,0 +1,5 @@
+#define IDI_APPICON 101
+#define IDR_PAYLOAD 102
+
+IDI_APPICON ICON "icon.ico"
+IDR_PAYLOAD RCDATA "payload.zip"
