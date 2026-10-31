@@ -20,7 +20,7 @@ echo "Target installation: $SCRIPT_DIR"
 echo ""
 
 if [ "$AUTO_CONFIRM" = false ]; then
-    read -p "Are you sure you want to completely uninstall CorridorKey Studio? [y/N]: " confirm
+    read -p "Uninstall CorridorKey Studio? [y/N]: " confirm
     case "$confirm" in
         [yY]|[yY][eE][sS])
             ;;
@@ -54,7 +54,7 @@ rm -rf "$SCRIPT_DIR/venv" "$SCRIPT_DIR/.venv"
 echo "[4/4] Removing installed application files..."
 # if weights directory exists and is large, ask or clean
 if [ "$AUTO_CONFIRM" = false ] && [ -d "$SCRIPT_DIR/weights" ]; then
-    read -p "Also remove downloaded model weights in weights/ (~1.5 GB)? [y/N]: " rm_weights
+    read -p "Delete downloaded model weights (~1.5 GB)? [y/N]: " rm_weights
     case "$rm_weights" in
         [yY]|[yY][eE][sS])
             rm -rf "$SCRIPT_DIR/weights"
