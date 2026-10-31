@@ -59,8 +59,25 @@ class KeyerEngineWorker(QThread):
         bitrate: str | None = None,
         ffmpeg_threads: int = 2,
         parent=None,
+        **kwargs,
     ):
         super().__init__(parent)
+        # support argument aliases
+        if "scale" in kwargs:
+            model_scale = kwargs["scale"]
+        if "foundation_chunk" in kwargs:
+            low_vram_foundation_chunk = kwargs["foundation_chunk"]
+        if "swin_batch" in kwargs:
+            low_vram_swin_window_batch = kwargs["swin_batch"]
+        if "linear" in kwargs:
+            cutout_linear = kwargs["linear"]
+        if "contrast_pivot" in kwargs:
+            linear_contrast_pivot = kwargs["contrast_pivot"]
+        if "mlp_chunk" in kwargs and kwargs["mlp_chunk"]:
+            low_vram_mlp_chunk_tokens = kwargs["mlp_chunk"]
+        if "attn_chunk" in kwargs and kwargs["attn_chunk"]:
+            low_vram_full_attn_query_chunk_tokens = kwargs["attn_chunk"]
+
         self.input_path = Path(input_path)
         self.output_dir = Path(output_dir)
         self.low_vram = low_vram

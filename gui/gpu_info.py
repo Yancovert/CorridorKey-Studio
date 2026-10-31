@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -14,6 +15,55 @@ class GpuProfile:
     recommended_low_vram: bool
     recommended_chunk: int
     recommended_stride: int
+    recommended_stage2_batch: int
+    recommended_foundation_chunk: int
+    recommended_swin_batch: int
+    recommended_ffmpeg_threads: int
+    tier_name: str
+    tier_desc: str
+
+
+# Peak GPU memory in GiB by megapixels of model input, measured at each Hann
+# chunk size from CorridorKey 2.0 empirical benchmarks.
+_VRAM_PEAK_GB = {
+    False: ((8, 24, 48, 80), (
+        (0.98, (6.19, 7.52, 9.77, 12.89)),
+        (2.21, (7.50, 11.33, 18.66, 24.89)),
+        (3.93, (9.06, 14.78, 23.92, 33.19)),
+        (8.36, (13.94, 25.96, 45.15, 70.45)),
+    )),
+    True: ((1, 2, 4, 8, 24, 48, 80), (
+        (0.98, (2.71, 2.78, 2.94, 3.25, 4.54, 6.57, 9.50)),
+        (2.21, (2.80, 2.97, 3.35, 4.12, 7.69, 13.20, 20.56)),
+        (3.93, (2.92, 3.23, 3.85, 5.09, 10.09, 17.57, 27.75)),
+        (8.36, (3.25, 3.92, 5.28, 8.38, 20.78, 39.66, 64.65)),
+    )),
+}
+
+
+def _interp(x: float, points) -> float:
+    points = list(points)
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        if x <= x1 or (x1, y1) == points[-1]:
+            if x1 == x0:
+                return y0
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return points[0][1]
+
+
+def estimate_peak_vram_gb(width: int, height: int, model_scale: float, hann_chunk: int, low_vram: bool) -> float:
+    eff_w = max(320, width) * model_scale
+    eff_h = max(240, height) * model_scale
+    megapixels = (eff_w * eff_h) / 1_000_000.0
+
+    chunks, rows = _VRAM_PEAK_GB[bool(low_vram)]
+    frames = max(hann_chunk, chunks[0])
+    per_chunk = [
+        max(_interp(megapixels, [(mp, peaks[i]) for mp, peaks in rows]), rows[0][1][i])
+        for i in range(len(chunks))
+    ]
+    val = _interp(frames, zip(chunks, per_chunk))
+    return round(float(val), 1)
 
 
 def _detect_via_smi() -> tuple[str, float, float] | None:
@@ -60,6 +110,12 @@ def detect_gpu_profile() -> GpuProfile:
                     recommended_low_vram=True,
                     recommended_chunk=4,
                     recommended_stride=2,
+                    recommended_stage2_batch=1,
+                    recommended_foundation_chunk=2,
+                    recommended_swin_batch=8,
+                    recommended_ffmpeg_threads=2,
+                    tier_name="CPU Fallback",
+                    tier_desc="No CUDA GPU detected; minimal chunk staging active.",
                 )
             props = torch.cuda.get_device_properties(0)
             total_gb = props.total_memory / (1024 ** 3)
@@ -76,22 +132,72 @@ def detect_gpu_profile() -> GpuProfile:
                 recommended_low_vram=True,
                 recommended_chunk=4,
                 recommended_stride=2,
+                recommended_stage2_batch=1,
+                recommended_foundation_chunk=2,
+                recommended_swin_batch=8,
+                recommended_ffmpeg_threads=2,
+                tier_name="CPU Fallback",
+                tier_desc="No CUDA GPU detected; minimal chunk staging active.",
             )
 
-    if total_gb <= 4.5:
-        low_vram = True
-        chunk = 8
-    elif total_gb <= 6.5:
-        low_vram = True
-        chunk = 16
-    elif total_gb <= 12.5:
-        low_vram = False
-        chunk = 48
-    else:
+    cpu_cores = os.cpu_count() or 4
+
+    # classify hardware tier and performance profile
+    if total_gb >= 20.0:
+        # workstation class (rtx 3090, 4090, a5000, a6000, a100, 6000 ada)
+        tier_name = "Ultra / Workstation (24GB+)"
+        tier_desc = "Unconstrained VRAM; high batch concurrency and full temporal window."
         low_vram = False
         chunk = 80
-
-    stride = max(1, chunk // 2)
+        stride = 40
+        stage2_batch = 4
+        foundation_chunk = 16
+        swin_batch = 64
+        ffmpeg_threads = min(12, max(4, cpu_cores // 2))
+    elif total_gb >= 11.5:
+        # high-end desktop (rtx 3080/ti, 4070/ti, 4080)
+        tier_name = "High-End Desktop (12GB-16GB)"
+        tier_desc = "Direct VRAM execution with high batch throughput."
+        low_vram = False
+        chunk = 64
+        stride = 32
+        stage2_batch = 2
+        foundation_chunk = 8
+        swin_batch = 32
+        ffmpeg_threads = min(8, max(2, cpu_cores // 2))
+    elif total_gb >= 7.5:
+        # standard desktop (rtx 3060, 3070, 4060, 2080)
+        tier_name = "Standard Desktop (8GB-10GB)"
+        tier_desc = "Direct in-memory execution for 1080p; stable multi-frame temporal window."
+        low_vram = False
+        chunk = 32
+        stride = 16
+        stage2_batch = 2
+        foundation_chunk = 8
+        swin_batch = 32
+        ffmpeg_threads = min(8, max(2, cpu_cores // 2))
+    elif total_gb >= 5.0:
+        # mid-range / 6gb cards (gtx 1660, rtx 2060, mobile 6gb)
+        tier_name = "Mid-Range GPU (6GB)"
+        tier_desc = "Staged memory execution enabled with balanced temporal attention."
+        low_vram = True
+        chunk = 16
+        stride = 8
+        stage2_batch = 1
+        foundation_chunk = 4
+        swin_batch = 16
+        ffmpeg_threads = min(6, max(2, cpu_cores // 2))
+    else:
+        # entry-level / mobile 4gb cards (rtx 3050 mobile, gtx 1650)
+        tier_name = "Entry / Mobile GPU (4GB)"
+        tier_desc = "Staged disk-backed execution active to fit tight VRAM."
+        low_vram = True
+        chunk = 8
+        stride = 4
+        stage2_batch = 1
+        foundation_chunk = 4
+        swin_batch = 16
+        ffmpeg_threads = min(4, max(2, cpu_cores // 2))
 
     return GpuProfile(
         name=name,
@@ -101,90 +207,10 @@ def detect_gpu_profile() -> GpuProfile:
         recommended_low_vram=low_vram,
         recommended_chunk=chunk,
         recommended_stride=stride,
-    )
-
-
-@dataclass
-class ClipHardwareRecommendation:
-    low_vram: bool
-    chunk: int
-    stride: int
-    title: str
-    explanation: str
-    is_tight_memory: bool
-
-
-def recommend_settings_for_clip(gpu: GpuProfile, width: int, height: int, total_frames: int) -> ClipHardwareRecommendation:
-    pixels = width * height
-    is_4k_or_higher = pixels >= (2560 * 1440)
-    res_label = f"{width}x{height}"
-
-    if not gpu.is_cuda_available:
-        return ClipHardwareRecommendation(
-            low_vram=True,
-            chunk=4,
-            stride=2,
-            title="CPU / Fallback Profile",
-            explanation="No CUDA GPU detected; staged execution enabled with minimal chunk size.",
-            is_tight_memory=True,
-        )
-
-    # 4gb cards (e.g. rtx 3050 mobile) need chunk 4 on 4k to fit attention maps
-    if gpu.total_vram_gb <= 4.5:
-        if is_4k_or_higher:
-            return ClipHardwareRecommendation(
-                low_vram=True,
-                chunk=4,
-                stride=2,
-                title="Ultra-Safe Staged Profile (4K / 4GB VRAM)",
-                explanation=f"Detected {res_label} on {gpu.total_vram_gb} GB GPU. Applied minimal chunk (4) and disk memmaps to avoid CUDA OOM.",
-                is_tight_memory=True,
-            )
-        return ClipHardwareRecommendation(
-            low_vram=True,
-            chunk=8,
-            stride=4,
-            title="Safe Staged Profile (1080p / 4GB VRAM)",
-            explanation=f"Detected {res_label} on {gpu.total_vram_gb} GB GPU. Applied chunk 8 with low-VRAM staging for optimal stability.",
-            is_tight_memory=False,
-        )
-
-    # 6gb to 8gb cards
-    if gpu.total_vram_gb <= 8.5:
-        if is_4k_or_higher:
-            return ClipHardwareRecommendation(
-                low_vram=True,
-                chunk=8,
-                stride=4,
-                title="Staged Profile (4K / Mid VRAM)",
-                explanation=f"Detected {res_label} on {gpu.total_vram_gb} GB GPU. Staging enabled with chunk 8 to preserve VRAM headroom.",
-                is_tight_memory=False,
-            )
-        return ClipHardwareRecommendation(
-            low_vram=False,
-            chunk=24,
-            stride=12,
-            title="Balanced In-Memory Profile",
-            explanation=f"Detected {res_label} on {gpu.total_vram_gb} GB GPU. Direct memory execution enabled with chunk 24.",
-            is_tight_memory=False,
-        )
-
-    # workstation cards with >= 12gb vram
-    if is_4k_or_higher:
-        return ClipHardwareRecommendation(
-            low_vram=False,
-            chunk=48,
-            stride=24,
-            title="High-Performance 4K Profile",
-            explanation=f"Detected {res_label} with ample {gpu.total_vram_gb} GB VRAM. Full resolution attention chunk 48 active.",
-            is_tight_memory=False,
-        )
-
-    return ClipHardwareRecommendation(
-        low_vram=False,
-        chunk=80,
-        stride=40,
-        title="Maximum Throughput Profile",
-        explanation=f"Detected {res_label} on {gpu.total_vram_gb} GB GPU. Maximum temporal window (chunk 80) active without staging.",
-        is_tight_memory=False,
+        recommended_stage2_batch=stage2_batch,
+        recommended_foundation_chunk=foundation_chunk,
+        recommended_swin_batch=swin_batch,
+        recommended_ffmpeg_threads=ffmpeg_threads,
+        tier_name=tier_name,
+        tier_desc=tier_desc,
     )

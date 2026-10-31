@@ -521,7 +521,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             SendMessageW(g_hChkWeights, WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
             SendMessageW(g_hChkWeights, BM_SETCHECK, BST_CHECKED, 0);
 
-            g_hChkLowVram = CreateWindowExW(0, L"BUTTON", L"Enable 4GB Low-VRAM safety mode by default", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 256, 480, 20, hwnd, (HMENU)IDC_CHK_LOWVRAM, NULL, NULL);
+            g_hChkLowVram = CreateWindowExW(0, L"BUTTON", L"Auto-detect GPU and configure performance profile", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 256, 480, 20, hwnd, (HMENU)IDC_CHK_LOWVRAM, NULL, NULL);
             SendMessageW(g_hChkLowVram, WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
             SendMessageW(g_hChkLowVram, BM_SETCHECK, BST_CHECKED, 0);
 

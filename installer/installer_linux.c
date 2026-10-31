@@ -13,7 +13,7 @@
 
 #include "payload_data.h"
 
-#define BUNDLED_COMMIT "485f5e9"
+#define BUNDLED_COMMIT "c0e80b0"
 #define BUNDLED_BRANCH "app-linux"
 
 typedef enum {
@@ -822,7 +822,7 @@ int main(int argc, char *argv[]) {
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g_app->chk_weights), TRUE);
     gtk_box_pack_start(GTK_BOX(box_opt), g_app->chk_weights, FALSE, FALSE, 0);
 
-    g_app->chk_lowvram = gtk_check_button_new_with_label("Enable 4GB Low-VRAM safety mode by default");
+    g_app->chk_lowvram = gtk_check_button_new_with_label("Auto-detect GPU and configure performance profile");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g_app->chk_lowvram), TRUE);
     gtk_box_pack_start(GTK_BOX(box_opt), g_app->chk_lowvram, FALSE, FALSE, 0);
 

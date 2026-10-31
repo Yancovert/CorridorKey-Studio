@@ -15,22 +15,10 @@ from PySide6.QtWidgets import (
     QFrame, QMessageBox, QDoubleSpinBox, QScrollArea, QLineEdit
 )
 
-from .gpu_info import detect_gpu_profile, GpuProfile
+from .gpu_info import detect_gpu_profile, GpuProfile, estimate_peak_vram_gb
 from .canvas import PreviewCanvas
 from .engine import KeyerEngineWorker
 from .updater import UpdateCheckWorker, UpdateInstallWorker
-
-
-def estimate_peak_vram_gb(width: int, height: int, model_scale: float, hann_chunk: int, low_vram: bool) -> float:
-    base_gb = 1.6
-    eff_w = max(320, width) * model_scale
-    eff_h = max(240, height) * model_scale
-    mp = (eff_w * eff_h) / 1_000_000.0
-    if low_vram:
-        dynamic_gb = mp * (0.04 * min(hann_chunk, 16) + 0.15)
-    else:
-        dynamic_gb = mp * (0.09 * hann_chunk + 0.3)
-    return round(base_gb + dynamic_gb, 1)
 
 
 class MainWindow(QMainWindow):
@@ -350,10 +338,11 @@ class MainWindow(QMainWindow):
         preset_layout = QVBoxLayout(preset_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.addItems([
-            "Balanced Studio (Recommended)",
+            "Balanced Studio (Hardware Optimized)",
             "Maximum Quality (Fine Hair & Edges)",
+            "High-Performance Workstation (24GB+ / Multi-Batch)",
             "Fast Turnaround (Speed & Quick Preview)",
-            "Low-VRAM Staged (Low Memory Footprint)",
+            "Low-VRAM Compatibility (4GB - 6GB Staged)",
             "Custom Advanced Tuning",
         ])
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_preset_changed)
@@ -477,10 +466,10 @@ class MainWindow(QMainWindow):
         ))
 
         self.chunk_slider = QSlider(Qt.Orientation.Horizontal)
-        self.chunk_slider.setRange(1, 128)
+        self.chunk_slider.setRange(1, 192)
         self.chunk_slider.setValue(self.gpu_profile.recommended_chunk)
         self.chunk_spin = QSpinBox()
-        self.chunk_spin.setRange(1, 128)
+        self.chunk_spin.setRange(1, 192)
         self.chunk_spin.setValue(self.gpu_profile.recommended_chunk)
         self._sync_int_slider(self.chunk_slider, self.chunk_spin)
         sampling_layout.addWidget(self._create_slider_param_row(
@@ -489,10 +478,10 @@ class MainWindow(QMainWindow):
         ))
 
         self.stride_slider = QSlider(Qt.Orientation.Horizontal)
-        self.stride_slider.setRange(1, 64)
+        self.stride_slider.setRange(1, 96)
         self.stride_slider.setValue(self.gpu_profile.recommended_stride)
         self.stride_spin = QSpinBox()
-        self.stride_spin.setRange(1, 64)
+        self.stride_spin.setRange(1, 96)
         self.stride_spin.setValue(self.gpu_profile.recommended_stride)
         self._sync_int_slider(self.stride_slider, self.stride_spin)
         sampling_layout.addWidget(self._create_slider_param_row(
@@ -519,13 +508,60 @@ class MainWindow(QMainWindow):
         self.low_vram_check.stateChanged.connect(self._on_param_changed)
         memory_layout.addWidget(self.low_vram_check)
 
-        note_vram = QLabel("Splits computation into smaller batches to fit on 4GB-6GB GPUs.")
+        note_vram = QLabel("Splits computation into disk-backed staging passes for 4GB-6GB GPUs. Uncheck on 12GB+ GPUs for fastest in-memory execution.")
         note_vram.setStyleSheet("color: #666666; font-size: 10px;")
         memory_layout.addWidget(note_vram)
 
         advanced_layout.addWidget(memory_group)
 
-        # 3. color space and adjustments
+        # 3. hardware concurrency and throughput
+        perf_group = QGroupBox("Hardware Concurrency & Concurrency")
+        perf_layout = QVBoxLayout(perf_group)
+
+        self.stage2_batch_slider = QSlider(Qt.Orientation.Horizontal)
+        self.stage2_batch_slider.setRange(1, 8)
+        self.stage2_batch_slider.setValue(self.gpu_profile.recommended_stage2_batch)
+        self.stage2_batch_spin = QSpinBox()
+        self.stage2_batch_spin.setRange(1, 8)
+        self.stage2_batch_spin.setValue(self.gpu_profile.recommended_stage2_batch)
+        self._sync_int_slider(self.stage2_batch_slider, self.stage2_batch_spin)
+        perf_layout.addWidget(self._create_slider_param_row(
+            "Stage-2 Batch:", self.stage2_batch_slider, self.stage2_batch_spin,
+            "Parallel output frames rendered per stage-2 batch. Set to 2-4 on 16GB-24GB GPUs."
+        ))
+
+        self.foundation_chunk_slider = QSlider(Qt.Orientation.Horizontal)
+        self.foundation_chunk_slider.setRange(2, 32)
+        self.foundation_chunk_slider.setValue(self.gpu_profile.recommended_foundation_chunk)
+        self.foundation_chunk_spin = QSpinBox()
+        self.foundation_chunk_spin.setRange(2, 32)
+        self.foundation_chunk_spin.setValue(self.gpu_profile.recommended_foundation_chunk)
+        self._sync_int_slider(self.foundation_chunk_slider, self.foundation_chunk_spin)
+        perf_layout.addWidget(self._create_slider_param_row(
+            "Foundation Chunk:", self.foundation_chunk_slider, self.foundation_chunk_spin,
+            "Chunk size for RVM / C-RADIO foundation passes. Set to 8-16 on high-end cards."
+        ))
+
+        self.swin_batch_spin = QSpinBox()
+        self.swin_batch_spin.setRange(8, 128)
+        self.swin_batch_spin.setSingleStep(8)
+        self.swin_batch_spin.setValue(self.gpu_profile.recommended_swin_batch)
+        perf_layout.addWidget(self._create_param_row(
+            "Swin Window Batch:", self.swin_batch_spin,
+            "Swin attention batch size. Set to 32 or 64 on 12GB+ GPUs."
+        ))
+
+        self.threads_spin = QSpinBox()
+        self.threads_spin.setRange(0, 32)
+        self.threads_spin.setValue(self.gpu_profile.recommended_ffmpeg_threads)
+        perf_layout.addWidget(self._create_param_row(
+            "FFmpeg Threads:", self.threads_spin,
+            "CPU worker threads for video decode and encode pipes (0 = auto)."
+        ))
+
+        advanced_layout.addWidget(perf_group)
+
+        # 4. color space and adjustments
         color_group = QGroupBox("Color and Contrast")
         color_layout = QVBoxLayout(color_group)
 
@@ -558,12 +594,6 @@ class MainWindow(QMainWindow):
         # hidden compatibility controls
         self.seed_spin = QSpinBox()
         self.seed_spin.setValue(0)
-        self.stage2_batch_spin = QSpinBox()
-        self.stage2_batch_spin.setValue(1)
-        self.foundation_chunk_spin = QSpinBox()
-        self.foundation_chunk_spin.setValue(4)
-        self.swin_batch_spin = QSpinBox()
-        self.swin_batch_spin.setValue(16)
         self.hint_quality_spin = QDoubleSpinBox()
         self.hint_quality_spin.setValue(0.95)
         self.carry_quality_spin = QDoubleSpinBox()
@@ -576,8 +606,6 @@ class MainWindow(QMainWindow):
         self.ffmpeg_preset_combo.addItems(["slow", "medium", "fast"])
         self.crf_spin = QSpinBox()
         self.crf_spin.setValue(14)
-        self.threads_spin = QSpinBox()
-        self.threads_spin.setValue(0)
         self.mlp_chunk_spin = QSpinBox()
         self.mlp_chunk_spin.setValue(0)
         self.attn_chunk_spin = QSpinBox()
@@ -923,9 +951,15 @@ class MainWindow(QMainWindow):
         return row_widget
 
     def _apply_gpu_defaults(self):
+        self.scale_spin.setValue(1.0)
         self.low_vram_check.setChecked(self.gpu_profile.recommended_low_vram)
         self.chunk_spin.setValue(self.gpu_profile.recommended_chunk)
         self.stride_spin.setValue(self.gpu_profile.recommended_stride)
+        self.stage2_batch_spin.setValue(self.gpu_profile.recommended_stage2_batch)
+        self.foundation_chunk_spin.setValue(self.gpu_profile.recommended_foundation_chunk)
+        self.swin_batch_spin.setValue(self.gpu_profile.recommended_swin_batch)
+        self.threads_spin.setValue(self.gpu_profile.recommended_ffmpeg_threads)
+        self.ffmpeg_preset_combo.setCurrentText("medium")
         self._update_vram_budget()
 
     def _on_toggle_advanced(self, checked: bool):
@@ -936,35 +970,83 @@ class MainWindow(QMainWindow):
         self.log_container.setVisible(checked)
 
     def _on_workflow_preset_changed(self, index: int):
-        if index == 0:  # balanced
+        if index == 0:  # Balanced Studio (Hardware Optimized)
+            self._apply_gpu_defaults()
+        elif index == 1:  # Maximum Quality (Fine Hair & Edges)
             self.scale_spin.setValue(1.0)
-            self.chunk_spin.setValue(self.gpu_profile.recommended_chunk)
-            self.stride_spin.setValue(self.gpu_profile.recommended_stride)
-            self.low_vram_check.setChecked(self.gpu_profile.recommended_low_vram)
+            if self.gpu_profile.total_vram_gb >= 20.0:
+                self.chunk_spin.setValue(96)
+                self.stride_spin.setValue(24)
+                self.low_vram_check.setChecked(False)
+                self.stage2_batch_spin.setValue(4)
+                self.foundation_chunk_spin.setValue(16)
+                self.swin_batch_spin.setValue(64)
+            elif self.gpu_profile.total_vram_gb >= 11.5:
+                self.chunk_spin.setValue(80)
+                self.stride_spin.setValue(20)
+                self.low_vram_check.setChecked(False)
+                self.stage2_batch_spin.setValue(2)
+                self.foundation_chunk_spin.setValue(8)
+                self.swin_batch_spin.setValue(32)
+            elif self.gpu_profile.total_vram_gb >= 7.5:
+                self.chunk_spin.setValue(48)
+                self.stride_spin.setValue(16)
+                self.low_vram_check.setChecked(False)
+                self.stage2_batch_spin.setValue(2)
+                self.foundation_chunk_spin.setValue(8)
+                self.swin_batch_spin.setValue(32)
+            else:
+                self.chunk_spin.setValue(16)
+                self.stride_spin.setValue(4)
+                self.low_vram_check.setChecked(True)
+                self.stage2_batch_spin.setValue(1)
+                self.foundation_chunk_spin.setValue(4)
+                self.swin_batch_spin.setValue(16)
+            self.ffmpeg_preset_combo.setCurrentText("slow")
+        elif index == 2:  # High-Performance Workstation (24GB+ / Multi-Batch)
+            self.scale_spin.setValue(1.0)
+            self.chunk_spin.setValue(80)
+            self.stride_spin.setValue(40)
+            self.low_vram_check.setChecked(False)
+            self.stage2_batch_spin.setValue(4)
+            self.foundation_chunk_spin.setValue(16)
+            self.swin_batch_spin.setValue(64)
+            self.threads_spin.setValue(min(12, max(4, (os.cpu_count() or 4) // 2)))
+            self.ffmpeg_preset_combo.setCurrentText("medium")
+        elif index == 3:  # Fast Turnaround (Speed & Quick Preview)
+            self.scale_spin.setValue(1.0)
+            if self.gpu_profile.total_vram_gb >= 11.5:
+                self.chunk_spin.setValue(48)
+                self.stride_spin.setValue(32)
+                self.low_vram_check.setChecked(False)
+                self.stage2_batch_spin.setValue(4)
+                self.foundation_chunk_spin.setValue(16)
+                self.swin_batch_spin.setValue(64)
+            elif self.gpu_profile.total_vram_gb >= 7.5:
+                self.chunk_spin.setValue(32)
+                self.stride_spin.setValue(24)
+                self.low_vram_check.setChecked(False)
+                self.stage2_batch_spin.setValue(2)
+                self.foundation_chunk_spin.setValue(8)
+                self.swin_batch_spin.setValue(32)
+            else:
+                self.chunk_spin.setValue(8)
+                self.stride_spin.setValue(6)
+                self.low_vram_check.setChecked(True)
+                self.stage2_batch_spin.setValue(1)
+                self.foundation_chunk_spin.setValue(4)
+                self.swin_batch_spin.setValue(16)
+            self.ffmpeg_preset_combo.setCurrentText("fast")
+        elif index == 4:  # Low-VRAM Compatibility (4GB - 6GB Staged)
+            self.scale_spin.setValue(1.0)
+            self.chunk_spin.setValue(8)
+            self.stride_spin.setValue(4)
+            self.low_vram_check.setChecked(True)
             self.stage2_batch_spin.setValue(1)
             self.foundation_chunk_spin.setValue(4)
             self.swin_batch_spin.setValue(16)
-        elif index == 1:  # max quality
-            self.scale_spin.setValue(1.0)
-            self.chunk_spin.setValue(max(16, self.gpu_profile.recommended_chunk * 2))
-            self.stride_spin.setValue(max(4, self.chunk_spin.value() // 4))
-            self.stage2_batch_spin.setValue(2)
-            self.swin_batch_spin.setValue(32)
-        elif index == 2:  # fast turnaround
-            self.scale_spin.setValue(0.75)
-            self.chunk_spin.setValue(4)
-            self.stride_spin.setValue(2)
-            self.low_vram_check.setChecked(True)
-            self.stage2_batch_spin.setValue(1)
-            self.swin_batch_spin.setValue(16)
-        elif index == 3:  # low vram safe
-            self.scale_spin.setValue(1.0)
-            self.chunk_spin.setValue(4)
-            self.stride_spin.setValue(2)
-            self.low_vram_check.setChecked(True)
-            self.stage2_batch_spin.setValue(1)
-            self.foundation_chunk_spin.setValue(2)
-            self.swin_batch_spin.setValue(8)
+            self.ffmpeg_preset_combo.setCurrentText("medium")
+        # index 5: Custom Advanced Tuning - user values preserved
 
         self._update_vram_budget()
 
@@ -984,22 +1066,23 @@ class MainWindow(QMainWindow):
         peak_est = self._get_current_vram_estimate()
         avail = self.gpu_profile.total_vram_gb
         is_safe = (avail == 0) or (peak_est <= avail)
+        mode_str = "Staged Memory" if self.low_vram_check.isChecked() else "Direct VRAM"
 
         if is_safe:
             self.vram_banner.setStyleSheet(
                 "background-color: #080808; border-left: 3px solid #2e2e2e; border-radius: 3px; padding: 6px 10px;"
             )
-            self.vram_title.setText(f"VRAM Budget: Normal (~{peak_est} GB estimated)")
+            self.vram_title.setText(f"Hardware: {self.gpu_profile.name} ({avail} GB) - {self.gpu_profile.tier_name}")
             self.vram_title.setStyleSheet("font-weight: 600; color: #888888; font-size: 11px;")
-            self.vram_detail.setText(f"Peak inference footprint fits comfortably inside {avail} GB VRAM.")
+            self.vram_detail.setText(f"Peak footprint ~{peak_est} GB ({mode_str}). Fits comfortably inside dedicated VRAM.")
         else:
             self.vram_banner.setStyleSheet(
                 "background-color: #120904; border-left: 3px solid #e67e22; border-radius: 3px; padding: 6px 10px;"
             )
-            self.vram_title.setText(f"VRAM Warning: High (~{peak_est} GB peak)")
+            self.vram_title.setText(f"Hardware: {self.gpu_profile.name} ({avail} GB) - Memory Pressure")
             self.vram_title.setStyleSheet("font-weight: 600; color: #e67e22; font-size: 11px;")
             self.vram_detail.setText(
-                f"Estimated memory exceeds available {avail} GB VRAM. Enable Low-VRAM or reduce chunk."
+                f"Peak footprint ~{peak_est} GB ({mode_str}) exceeds {avail} GB dedicated VRAM. System may use shared memory or encounter OOM."
             )
 
     def _browse_input(self):
@@ -1269,19 +1352,19 @@ class MainWindow(QMainWindow):
         avail = self.gpu_profile.total_vram_gb
         if avail > 0 and peak_est > avail:
             box = QMessageBox(self)
-            box.setWindowTitle("Resource Warning")
+            box.setWindowTitle("Resource Notification")
             box.setText(
-                f"Estimated peak memory (~{peak_est} GB) exceeds detected GPU VRAM ({avail} GB).\n\n"
-                f"Running this configuration may cause a CUDA out-of-memory (OOM) crash.\n\n"
-                f"Do you want to proceed anyway, or revert to the safe hardware preset?"
+                f"Estimated peak memory (~{peak_est} GB) exceeds detected dedicated GPU VRAM ({avail} GB).\n\n"
+                f"On workstation GPUs with unified memory or sufficient swap, you can proceed directly.\n\n"
+                f"To optimize automatically for your hardware tier ({self.gpu_profile.tier_name}), click 'Auto-Adapt to Hardware'."
             )
             proceed_btn = box.addButton("Proceed Anyway", QMessageBox.ButtonRole.AcceptRole)
-            safe_btn = box.addButton("Revert to Safe Preset", QMessageBox.ButtonRole.ActionRole)
+            adapt_btn = box.addButton("Auto-Adapt to Hardware", QMessageBox.ButtonRole.ActionRole)
             box.addButton(QMessageBox.StandardButton.Cancel)
             box.exec()
 
-            if box.clickedButton() == safe_btn:
-                self.workflow_combo.setCurrentIndex(3)
+            if box.clickedButton() == adapt_btn:
+                self.workflow_combo.setCurrentIndex(0)
                 return
             elif box.clickedButton() != proceed_btn:
                 return
