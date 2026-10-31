@@ -40,7 +40,15 @@ def load_settings() -> dict:
         return {}
     try:
         with open(settings_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            # auto-migrate legacy brightness offset (0.0) to linear gain multiplier (1.0)
+            if isinstance(data, dict) and "bright" in data:
+                try:
+                    if float(data["bright"]) <= 0.05:
+                        data["bright"] = 1.0
+                except (ValueError, TypeError):
+                    data["bright"] = 1.0
+            return data
     except Exception:
         return {}
 

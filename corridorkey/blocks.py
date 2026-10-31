@@ -311,6 +311,16 @@ class SwiGLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         chunk_tokens = int(getattr(self, 'inference_chunk_tokens', 0) or 0)
+        if chunk_tokens > 0 and not self.training and x.dim() == 5 and x.shape[1] > 1:
+            # chunk along frames so 2d depthwise conv fits into tight vram
+            B, T, H, W, C = x.shape
+            frame_chunk = max(1, chunk_tokens // max(1, H * W))
+            frame_chunk = min(frame_chunk, 4)
+            if T > frame_chunk:
+                outs = []
+                for t0 in range(0, T, frame_chunk):
+                    outs.append(self.forward(x[:, t0:t0 + frame_chunk]))
+                return torch.cat(outs, dim=1)
         if (chunk_tokens > 0 and not self.training and self.dw is None
                 and x.numel() // x.shape[-1] > chunk_tokens):
             shape = x.shape
@@ -366,6 +376,16 @@ class DepthwiseSwiGLU2D(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """x: (B, H, W, C). Returns a residual branch in the same layout."""
+        max_batch = int(getattr(self, 'inference_chunk_batch', 0) or 0)
+        if max_batch <= 0 and not self.training:
+            # chunk frames during cuda inference to prevent activation spikes
+            max_batch = 4 if x.is_cuda else 0
+        if max_batch > 0 and not self.training and x.shape[0] > max_batch:
+            outs = []
+            for i in range(0, x.shape[0], max_batch):
+                outs.append(self.forward(x[i:i + max_batch]))
+            return torch.cat(outs, dim=0)
+
         u = self.norm(x)
         # NHWC-contiguous -> NCHW shape with channels-last strides. Avoid an
         # explicit contiguous copy; cuDNN handles this layout efficiently.

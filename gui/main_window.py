@@ -15,7 +15,10 @@ from PySide6.QtWidgets import (
     QFrame, QMessageBox, QDoubleSpinBox, QScrollArea, QLineEdit
 )
 
-from .gpu_info import detect_gpu_profile, GpuProfile, estimate_peak_vram_gb
+from .gpu_info import (
+    detect_gpu_profile, GpuProfile, estimate_peak_vram_gb,
+    enumerate_system_gpus, get_gpu_dropdown_options, SystemGpuDevice
+)
 from .canvas import PreviewCanvas
 from .engine import KeyerEngineWorker
 from .updater import UpdateCheckWorker, UpdateInstallWorker
@@ -34,6 +37,8 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
+        self.system_gpus: list[SystemGpuDevice] = enumerate_system_gpus()
+        self.gpu_options = get_gpu_dropdown_options(self.system_gpus)
         self.gpu_profile: GpuProfile = detect_gpu_profile()
         self.worker: KeyerEngineWorker | None = None
         self.update_checker: UpdateCheckWorker | None = None
@@ -665,6 +670,33 @@ class MainWindow(QMainWindow):
 
         advanced_layout.addLayout(settings_bar)
 
+        # GPU Device Selector
+        gpu_row = QHBoxLayout()
+        gpu_row.setContentsMargins(0, 2, 0, 2)
+        gpu_label = QLabel("Compute GPU:")
+        gpu_label.setStyleSheet("color: #8b949e; font-size: 11px; font-weight: 500;")
+        gpu_row.addWidget(gpu_label)
+
+        self.gpu_combo = QComboBox()
+        self.gpu_combo.setFixedHeight(26)
+        self.gpu_combo.setStyleSheet(
+            "QComboBox { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
+            "border-radius: 4px; padding: 2px 8px; font-size: 11px; } "
+            "QComboBox:hover { border-color: #484f58; } "
+            "QComboBox::drop-down { border: none; } "
+            "QComboBox QAbstractItemView { background-color: #161b22; color: #c9d1d9; selection-background-color: #1f6feb; }"
+        )
+        for label, dev_id, is_compat, cuda_idx in self.gpu_options:
+            self.gpu_combo.addItem(label, userData={"id": dev_id, "compat": is_compat, "cuda_idx": cuda_idx})
+        self.gpu_combo.currentIndexChanged.connect(self._on_gpu_selection_changed)
+        gpu_row.addWidget(self.gpu_combo, stretch=1)
+        advanced_layout.addLayout(gpu_row)
+
+        self.gpu_warning_label = QLabel("")
+        self.gpu_warning_label.setStyleSheet("color: #f85149; font-size: 11px; padding: 0 4px 4px 4px;")
+        self.gpu_warning_label.setVisible(False)
+        advanced_layout.addWidget(self.gpu_warning_label)
+
         # 1. sampling and temporal windows
         sampling_group = QGroupBox("Temporal Windows")
         sampling_layout = QVBoxLayout(sampling_group)
@@ -791,14 +823,14 @@ class MainWindow(QMainWindow):
         color_layout.addWidget(self._create_slider_param_row("Contrast Multiplier:", self.contrast_slider, self.contrast_spin, ""))
 
         self.bright_slider = QSlider(Qt.Orientation.Horizontal)
-        self.bright_slider.setRange(-100, 100)
-        self.bright_slider.setValue(0)
+        self.bright_slider.setRange(10, 250)
+        self.bright_slider.setValue(100)
         self.bright_spin = QDoubleSpinBox()
-        self.bright_spin.setRange(-1.0, 1.0)
+        self.bright_spin.setRange(0.1, 2.5)
         self.bright_spin.setSingleStep(0.05)
-        self.bright_spin.setValue(0.0)
+        self.bright_spin.setValue(1.0)
         self._sync_float_slider(self.bright_slider, self.bright_spin, 100.0)
-        color_layout.addWidget(self._create_slider_param_row("Brightness Offset:", self.bright_slider, self.bright_spin, ""))
+        color_layout.addWidget(self._create_slider_param_row("Brightness Multiplier:", self.bright_slider, self.bright_spin, ""))
 
         advanced_layout.addWidget(color_group)
 
@@ -810,7 +842,7 @@ class MainWindow(QMainWindow):
         self.carry_quality_spin = QDoubleSpinBox()
         self.carry_quality_spin.setValue(0.95)
         self.contrast_pivot_spin = QDoubleSpinBox()
-        self.contrast_pivot_spin.setValue(0.50)
+        self.contrast_pivot_spin.setValue(0.18)
         self.ffmpeg_codec_combo = QComboBox()
         self.ffmpeg_codec_combo.addItems(["libx264", "libx265", "prores_ks", "ffv1"])
         self.ffmpeg_preset_combo = QComboBox()
@@ -1198,7 +1230,8 @@ class MainWindow(QMainWindow):
         if "contrast" in data:
             self.contrast_spin.setValue(float(data["contrast"]))
         if "bright" in data:
-            self.bright_spin.setValue(float(data["bright"]))
+            val = float(data["bright"])
+            self.bright_spin.setValue(1.0 if val <= 0.05 else val)
         if "deliverable" in data:
             deliv_val = data["deliverable"]
             idx = self.deliverable_combo.findText(deliv_val)
@@ -1210,8 +1243,13 @@ class MainWindow(QMainWindow):
                         break
             if idx >= 0:
                 self.deliverable_combo.setCurrentIndex(idx)
-        if "blender_script" in data:
-            self.blender_script_check.setChecked(bool(data["blender_script"]))
+        if "selected_gpu" in data:
+            target_id = str(data["selected_gpu"])
+            for i in range(self.gpu_combo.count()):
+                d = self.gpu_combo.itemData(i) or {}
+                if d.get("id") == target_id:
+                    self.gpu_combo.setCurrentIndex(i)
+                    break
         if "output_dir" in data:
             self.output_dir = Path(data["output_dir"]).resolve()
             self.outdir_label.setText(f"Folder: {self.output_dir.name}")
@@ -1220,7 +1258,11 @@ class MainWindow(QMainWindow):
         self._update_vram_budget()
 
     def _get_current_settings_dict(self) -> dict:
+        gpu_id = "auto"
+        if hasattr(self, "gpu_combo") and self.gpu_combo.currentData():
+            gpu_id = self.gpu_combo.currentData().get("id", "auto")
         return {
+            "selected_gpu": gpu_id,
             "low_vram": self.low_vram_check.isChecked(),
             "scale": round(self.scale_spin.value(), 2),
             "chunk": self.chunk_spin.value(),
@@ -1249,7 +1291,7 @@ class MainWindow(QMainWindow):
     def _open_settings_dialog(self):
         from .settings_dialog import SettingsDialog
         current_data = self._get_current_settings_dict()
-        dlg = SettingsDialog(self, self.gpu_profile, self.app_root, current_data)
+        dlg = SettingsDialog(self, self.gpu_profile, self.app_root, current_data, system_gpus=self.system_gpus)
         dlg.settings_applied.connect(self._apply_settings_dict)
         dlg.exec()
 
@@ -1259,6 +1301,37 @@ class MainWindow(QMainWindow):
 
     def _on_toggle_log(self, checked: bool):
         self.log_container.setVisible(checked)
+
+    def _on_gpu_selection_changed(self, index: int):
+        data = self.gpu_combo.currentData()
+        if not data:
+            return
+        is_compat = data.get("compat", True)
+        dev_id = data.get("id", "auto")
+        cuda_idx = data.get("cuda_idx")
+
+        if not is_compat:
+            self.gpu_warning_label.setText("Selected adapter does not support CUDA. Inference requires NVIDIA GPU.")
+            self.gpu_warning_label.setVisible(True)
+            self.gpu_badge.setText("GPU Incompatible")
+            self.gpu_badge.setToolTip("Selected display adapter lacks CUDA support. Neural network inference will fail.")
+            self.gpu_badge.setStyleSheet(
+                "background-color: #3b181a; border: 1px solid #da3633; border-radius: 4px; "
+                "padding: 3px 10px; color: #f85149; font-size: 11px; font-weight: 600;"
+            )
+        else:
+            self.gpu_warning_label.setVisible(False)
+            profile = detect_gpu_profile(cuda_index=cuda_idx)
+            self.gpu_profile = profile
+            is_hybrid = dev_id == "auto" and any(d.is_integrated for d in self.system_gpus)
+            tier_badge = "Hybrid" if is_hybrid else profile.short_name
+            self.gpu_badge.setText(f"{profile.short_name} ({profile.total_vram_gb:.1f} GB) | {tier_badge}")
+            self.gpu_badge.setToolTip(f"GPU: {profile.name}\nTier: {profile.tier_name}\nVRAM: {profile.total_vram_gb:.1f} GB")
+            self.gpu_badge.setStyleSheet(
+                "background-color: #21252b; border: 1px solid #2e343d; border-radius: 4px; "
+                "padding: 3px 10px; color: #b0bac5; font-size: 11px; font-weight: 600;"
+            )
+            self._update_vram_budget()
 
     def _on_workflow_preset_changed(self, index: int):
         if index == 0:  # Balanced Studio (Hardware Optimized)
@@ -1647,6 +1720,45 @@ class MainWindow(QMainWindow):
             elif box.clickedButton() != proceed_btn:
                 return
 
+        gpu_data = self.gpu_combo.currentData() or {}
+        is_compat = gpu_data.get("compat", True)
+        dev_id = gpu_data.get("id", "auto")
+        cuda_idx = gpu_data.get("cuda_idx")
+
+        if not is_compat:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Critical)
+            box.setWindowTitle("Incompatible GPU Selected")
+            box.setText(
+                "The selected display adapter cannot execute CorridorKey v2 neural network inference.\n\n"
+                f"Selected: {self.gpu_combo.currentText()}\n\n"
+                "Reason: Neural network inference requires a CUDA-capable NVIDIA GPU.\n\n"
+                "Please switch the GPU selector in Advanced Settings to 'Auto (Hybrid Offload)' or select a compatible NVIDIA GPU."
+            )
+            box.setStyleSheet(
+                "QMessageBox { background-color: #1a1d21; color: #dce1e7; } "
+                "QPushButton { background-color: #21252b; color: #dce1e7; border: 1px solid #333942; padding: 6px 14px; border-radius: 4px; } "
+                "QPushButton:hover { background-color: #282d35; }"
+            )
+            box.exec()
+            return
+
+        if dev_id == "auto" and not any(d.is_cuda for d in self.system_gpus):
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Critical)
+            box.setWindowTitle("No CUDA GPU Available")
+            box.setText(
+                "No CUDA-capable NVIDIA GPU was detected on this system.\n\n"
+                "CorridorKey v2 requires an NVIDIA GPU with CUDA support and at least 4 GB VRAM to run."
+            )
+            box.setStyleSheet(
+                "QMessageBox { background-color: #1a1d21; color: #dce1e7; } "
+                "QPushButton { background-color: #21252b; color: #dce1e7; border: 1px solid #333942; padding: 6px 14px; border-radius: 4px; } "
+                "QPushButton:hover { background-color: #282d35; }"
+            )
+            box.exec()
+            return
+
         self.start_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         self.progress_bar.setVisible(True)
@@ -1708,6 +1820,7 @@ class MainWindow(QMainWindow):
             frame_dir_fps=self.frame_dir_fps_spin.value(),
             frame_dir_linear=self.frame_dir_linear_check.isChecked(),
             temp_dir=self.temp_dir_edit.text() if self.temp_dir_edit.text() else None,
+            cuda_device_index=cuda_idx,
         )
 
         self.worker.progress_update.connect(self._on_progress)

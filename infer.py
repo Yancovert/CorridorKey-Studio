@@ -7,6 +7,7 @@ import tempfile
 
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 print("CorridorKey backend process started.", flush=True)
 print("Importing PyTorch runtime and loading foundation models...", flush=True)
@@ -115,7 +116,7 @@ def main():
     ap.add_argument("--low_vram_foundation_chunk", type=int, default=4)
     ap.add_argument("--low_vram_mlp_chunk_tokens", type=int, default=65536)
     ap.add_argument("--low_vram_enc_frame_chunk", type=int, default=1)
-    ap.add_argument("--low_vram_swin_window_batch", type=int, default=16)
+    ap.add_argument("--low_vram_swin_window_batch", type=int, default=4)
     ap.add_argument("--low_vram_full_attn_query_chunk_tokens", type=int,
                     default=2048)
     args = ap.parse_args()
@@ -141,6 +142,8 @@ def main():
     auto_vram = args.hann_chunk is None and args.hann_stride is None and not args.low_vram
     hann_chunk = args.hann_chunk if args.hann_chunk is not None else 80
     hann_stride = args.hann_stride if args.hann_stride is not None else max(1, hann_chunk // 2)
+    clean_brightness = 1.0 if args.linear_brightness <= 0.05 else float(args.linear_brightness)
+    clean_contrast = 1.0 if args.linear_contrast <= 0.05 else float(args.linear_contrast)
     infer_cfg = InferenceConfig(
         hann_chunk=hann_chunk,
         hann_stride=hann_stride,
@@ -162,8 +165,8 @@ def main():
         stage2_batch=args.stage2_batch,
         outputs=_parse_outputs(args.outputs),
         temp_dir=Path(args.temp_dir),
-        linear_brightness=args.linear_brightness,
-        linear_contrast=args.linear_contrast,
+        linear_brightness=clean_brightness,
+        linear_contrast=clean_contrast,
         linear_contrast_pivot=args.linear_contrast_pivot,
         frame_dir_fps=args.frame_dir_fps,
         frame_dir_linear=args.frame_dir_linear,

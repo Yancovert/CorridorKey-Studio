@@ -72,13 +72,183 @@ def estimate_peak_vram_gb(width: int, height: int, model_scale: float, hann_chun
     return round(float(val), 1)
 
 
-def _detect_via_smi() -> tuple[str, float, float] | None:
+@dataclass
+class SystemGpuDevice:
+    name: str
+    vendor: str
+    vram_gb: float
+    cuda_index: int | None
+    is_cuda: bool
+    is_integrated: bool
+    device_id: str
+
+    @property
+    def display_name(self) -> str:
+        mem_str = f"({self.vram_gb:.1f} GB)" if self.vram_gb > 0 else ""
+        if self.is_cuda:
+            status = "Compatible"
+        else:
+            status = "[Unsupported: No CUDA]"
+        return f"[{self.vendor}] {self.name} {mem_str} - {status}".strip()
+
+
+def enumerate_system_gpus() -> list[SystemGpuDevice]:
+    devices: list[SystemGpuDevice] = []
+    seen_names = set()
+
+    # 1. Enumerate NVIDIA CUDA GPUs via nvidia-smi
+    smi = shutil.which("nvidia-smi")
+    if smi:
+        try:
+            res = subprocess.run(
+                [smi, "--query-gpu=index,name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=1.5,
+            )
+            if res.returncode == 0:
+                for line in res.stdout.strip().splitlines():
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 3:
+                        idx = int(parts[0])
+                        raw_name = parts[1]
+                        total_gb = float(parts[2]) / 1024.0
+                        clean_name = raw_name.replace("NVIDIA GeForce ", "").replace("NVIDIA ", "").strip()
+                        dev = SystemGpuDevice(
+                            name=clean_name,
+                            vendor="NVIDIA",
+                            vram_gb=round(total_gb, 1),
+                            cuda_index=idx,
+                            is_cuda=True,
+                            is_integrated=False,
+                            device_id=f"nvidia_{idx}",
+                        )
+                        devices.append(dev)
+                        seen_names.add(clean_name.lower())
+        except Exception:
+            pass
+
+    # Fallback to torch.cuda if nvidia-smi didn't find devices
+    if not devices:
+        try:
+            import torch
+            if torch.cuda.is_available():
+                for idx in range(torch.cuda.device_count()):
+                    props = torch.cuda.get_device_properties(idx)
+                    total_gb = props.total_memory / (1024 ** 3)
+                    clean_name = props.name.replace("NVIDIA GeForce ", "").replace("NVIDIA ", "").strip()
+                    dev = SystemGpuDevice(
+                        name=clean_name,
+                        vendor="NVIDIA",
+                        vram_gb=round(total_gb, 1),
+                        cuda_index=idx,
+                        is_cuda=True,
+                        is_integrated=False,
+                        device_id=f"nvidia_{idx}",
+                    )
+                    devices.append(dev)
+                    seen_names.add(clean_name.lower())
+        except Exception:
+            pass
+
+    # 2. Discover system display adapters (Intel, AMD, etc.)
+    import sys
+    if sys.platform == "win32":
+        try:
+            cmd = ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -Property Name, AdapterRAM | ConvertTo-Json"]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
+            if res.returncode == 0 and res.stdout.strip():
+                import json
+                try:
+                    parsed = json.loads(res.stdout)
+                    items = parsed if isinstance(parsed, list) else [parsed]
+                    for i, it in enumerate(items):
+                        raw_name = str(it.get("Name", "")).strip()
+                        if not raw_name:
+                            continue
+                        clean = raw_name.replace("NVIDIA GeForce ", "").replace("NVIDIA ", "").strip()
+                        if clean.lower() in seen_names or "nvidia" in raw_name.lower():
+                            continue
+                        vendor = "Intel" if "intel" in raw_name.lower() else ("AMD" if "amd" in raw_name.lower() or "radeon" in raw_name.lower() else "Other")
+                        ram_bytes = it.get("AdapterRAM") or 0
+                        vram_gb = round(float(ram_bytes) / (1024 ** 3), 1) if ram_bytes > 0 else 0.0
+                        dev = SystemGpuDevice(
+                            name=clean,
+                            vendor=vendor,
+                            vram_gb=vram_gb,
+                            cuda_index=None,
+                            is_cuda=False,
+                            is_integrated=(vendor in ("Intel", "AMD")),
+                            device_id=f"win_adapter_{i}",
+                        )
+                        devices.append(dev)
+                        seen_names.add(clean.lower())
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    else:
+        # Linux: inspect lspci
+        lspci = shutil.which("lspci")
+        if lspci:
+            try:
+                res = subprocess.run([lspci], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5)
+                if res.returncode == 0:
+                    for i, line in enumerate(res.stdout.splitlines()):
+                        lower = line.lower()
+                        if "vga compatible controller" in lower or "3d controller" in lower or "display controller" in lower:
+                            parts = line.split(":", 2)
+                            desc = parts[2].strip() if len(parts) >= 3 else line
+                            if " (rev " in desc:
+                                desc = desc.split(" (rev ")[0].strip()
+                            vendor = "Intel" if "intel" in lower else ("AMD" if "amd" in lower or "advanced micro devices" in lower else ("NVIDIA" if "nvidia" in lower else "Other"))
+                            clean = desc.replace("Intel Corporation ", "").replace("NVIDIA Corporation ", "").replace("Advanced Micro Devices, Inc. [AMD/ATI] ", "").strip()
+                            if vendor == "NVIDIA" or clean.lower() in seen_names or any(s in clean.lower() for s in seen_names):
+                                continue
+                            dev = SystemGpuDevice(
+                                name=clean,
+                                vendor=vendor,
+                                vram_gb=0.0,
+                                cuda_index=None,
+                                is_cuda=False,
+                                is_integrated=True,
+                                device_id=f"linux_adapter_{i}",
+                            )
+                            devices.append(dev)
+                            seen_names.add(clean.lower())
+            except Exception:
+                pass
+
+    return devices
+
+
+def get_gpu_dropdown_options(devices: list[SystemGpuDevice]) -> list[tuple[str, str, bool, int | None]]:
+    has_cuda = any(d.is_cuda for d in devices)
+    first_cuda_idx = next((d.cuda_index for d in devices if d.is_cuda), 0 if has_cuda else None)
+
+    if has_cuda:
+        has_integrated = any(d.is_integrated for d in devices)
+        auto_label = "Auto (Hybrid Offload: iGPU Display + dGPU Inference)" if has_integrated else "Auto (Best NVIDIA CUDA GPU)"
+    else:
+        auto_label = "Auto [Unsupported: No CUDA GPU Detected]"
+
+    options: list[tuple[str, str, bool, int | None]] = [(auto_label, "auto", has_cuda, first_cuda_idx)]
+    for dev in devices:
+        options.append((dev.display_name, dev.device_id, dev.is_cuda, dev.cuda_index))
+    return options
+
+
+def _detect_via_smi(index: int | None = None) -> tuple[str, float, float] | None:
     smi = shutil.which("nvidia-smi")
     if not smi:
         return None
     try:
+        cmd = [smi, "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"]
+        if index is not None:
+            cmd.insert(1, f"--id={index}")
         res = subprocess.run(
-            [smi, "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -97,9 +267,9 @@ def _detect_via_smi() -> tuple[str, float, float] | None:
     return None
 
 
-def detect_gpu_profile() -> GpuProfile:
+def detect_gpu_profile(cuda_index: int | None = None) -> GpuProfile:
     # fast path: query nvidia-smi in ~20ms without loading heavyweight pytorch cuda runtime
-    smi_res = _detect_via_smi()
+    smi_res = _detect_via_smi(index=cuda_index)
     if smi_res is not None:
         name, total_gb, free_gb = smi_res
         is_cuda = True
@@ -123,9 +293,12 @@ def detect_gpu_profile() -> GpuProfile:
                     tier_name="CPU Fallback",
                     tier_desc="No CUDA GPU detected; minimal chunk staging active.",
                 )
-            props = torch.cuda.get_device_properties(0)
+            target_idx = cuda_index if cuda_index is not None else 0
+            if target_idx >= torch.cuda.device_count():
+                target_idx = 0
+            props = torch.cuda.get_device_properties(target_idx)
             total_gb = props.total_memory / (1024 ** 3)
-            free_bytes, _ = torch.cuda.mem_get_info(0)
+            free_bytes, _ = torch.cuda.mem_get_info(target_idx)
             free_gb = free_bytes / (1024 ** 3)
             name = props.name
             is_cuda = True

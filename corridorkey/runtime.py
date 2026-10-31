@@ -113,7 +113,7 @@ class InferenceConfig:
     low_vram_foundation_chunk: int = 4
     low_vram_mlp_chunk_tokens: int = 65536
     low_vram_enc_frame_chunk: int = 1
-    low_vram_swin_window_batch: int = 16
+    low_vram_swin_window_batch: int = 4
     low_vram_full_attn_query_chunk_tokens: int = 2048
     stage2_batch: int = 1
     outputs: set[str] = field(default_factory=lambda: {"alpha", "fg"})
@@ -278,6 +278,8 @@ def configure_low_vram_inference(model, cfg: InferenceConfig):
         if name in ("FullSpatialAttention2D", "FullAttention3D"):
             module.inference_query_chunk_tokens = max(
                 0, int(cfg.low_vram_full_attn_query_chunk_tokens))
+        if name == "DepthwiseSwiGLU2D":
+            module.inference_chunk_batch = 4
 
 
 def _build_foundation_inputs(rgb_bt: torch.Tensor):
@@ -401,9 +403,13 @@ def precompute_foundations_to_memmap(model, source, meta, prefix: Path,
     return paths
 
 
-def _phase1_setup(model, *, stage1_on_gpu: bool = True):
+def _phase1_setup(model, *, stage1_on_gpu: bool = True, low_vram: bool = False):
     model.foundations.cuda()
-    # Low-VRAM mode precomputes foundation features first, so stage 1 waits on CPU.
+    if low_vram and torch.cuda.is_available():
+        # cast weights to bf16/fp16 to halve parameter footprint on 4gb gpus
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        model.stage1.to(dtype)
+        model.stage2.to(dtype)
     if stage1_on_gpu:
         model.stage1.cuda()
     else:
@@ -615,14 +621,14 @@ def _despill_average_srgb_torch(fg: torch.Tensor, strength: float = 0.5) -> torc
 
 
 def _srgb_to_bgr_uint16_cpu(x: torch.Tensor) -> np.ndarray:
-    x = x.clamp(0.0, 1.0)
+    x = torch.nan_to_num(x, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
     x = x[:, [2, 1, 0]].permute(0, 2, 3, 1).contiguous().cpu().numpy()
     return (x * 65535.0).astype(np.uint16)
 
 
 def _srgb_to_bgra_uint16_cpu(rgb: torch.Tensor, alpha: torch.Tensor) -> np.ndarray:
-    rgb = rgb.clamp(0.0, 1.0)
-    alpha = alpha.clamp(0.0, 1.0)
+    rgb = torch.nan_to_num(rgb, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
+    alpha = torch.nan_to_num(alpha, nan=0.0, posinf=1.0, neginf=0.0).clamp(0.0, 1.0)
     bgra = torch.cat([rgb[:, [2, 1, 0]], alpha], dim=1)
     bgra = bgra.permute(0, 2, 3, 1).contiguous().cpu().numpy()
     return (bgra * 65535.0).astype(np.uint16)
@@ -838,7 +844,7 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
             load_initial_hint_frame(initial_hint_path, meta)
             if none_path(initial_hint_path) is not None else None
         )
-        _phase1_setup(model, stage1_on_gpu=not cfg.low_vram)
+        _phase1_setup(model, stage1_on_gpu=not cfg.low_vram, low_vram=cfg.low_vram)
         if cfg.low_vram:
             configure_low_vram_inference(model, cfg)
         rvm_path = cfg.temp_dir / f"{clip_name}_rvm_feat.f16"

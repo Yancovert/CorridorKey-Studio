@@ -177,8 +177,12 @@ def invert_linear_adjust(linear: np.ndarray, meta: dict) -> np.ndarray:
     contrast = float(meta.get("linear_contrast", 1.0))
     if abs(gain - 1.0) <= 1e-6 and abs(contrast - 1.0) <= 1e-6:
         return linear
+    if abs(gain) < 1e-4 or abs(contrast) < 1e-4:
+        return linear
     pivot = float(meta.get("linear_contrast_pivot", 0.18))
-    return (linear / gain - pivot) / contrast + pivot
+    safe_gain = max(1e-4, gain)
+    safe_contrast = max(1e-4, contrast)
+    return (linear / safe_gain - pivot) / safe_contrast + pivot
 
 
 def probe_video_meta(video_path: str, *, num_frames: int, shape_quantum: int,
