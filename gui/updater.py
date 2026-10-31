@@ -131,6 +131,16 @@ class UpdateInstallWorker(QThread):
                 apply_pct = int(88 + ((idx + 1) / len(sync_items)) * 7)
                 self.progress.emit(apply_pct, f"Applying {item}...")
 
+            # ensure executable permissions on scripts for unix/linux
+            if sys.platform != "win32":
+                for fname in ["launch_gui.sh", "install.sh", "infer.py", "run_interactive.py"]:
+                    target_file = self.app_root / fname
+                    if target_file.exists():
+                        try:
+                            target_file.chmod(0o755)
+                        except Exception:
+                            pass
+
     def run(self):
         try:
             self.progress.emit(10, "Verifying local installation...")
@@ -155,6 +165,15 @@ class UpdateInstallWorker(QThread):
 
             if not updated_via_git:
                 self._extract_zip_archive()
+
+            if sys.platform != "win32":
+                for fname in ["launch_gui.sh", "install.sh", "infer.py", "run_interactive.py"]:
+                    target_file = self.app_root / fname
+                    if target_file.exists():
+                        try:
+                            target_file.chmod(0o755)
+                        except Exception:
+                            pass
 
             self.progress.emit(96, "Updating version stamp...")
             version_file = self.app_root / ".build_version"

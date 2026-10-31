@@ -210,7 +210,7 @@ static void create_desktop_shortcuts(const char *target_dir) {
             fprintf(df, "Name=CorridorKey Studio\n");
             fprintf(df, "GenericName=Chroma Keying Suite\n");
             fprintf(df, "Comment=AI-powered green screen cutout tool for Blender\n");
-            fprintf(df, "Exec=%s/launch_gui.sh\n", target_dir);
+            fprintf(df, "Exec=bash %s/launch_gui.sh\n", target_dir);
             fprintf(df, "Path=%s\n", target_dir);
             fprintf(df, "Icon=%s/gui/icon.png\n", target_dir);
             fprintf(df, "Terminal=false\n");
