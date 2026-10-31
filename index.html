@@ -3,134 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CorridorKey Studio - green screen tool for blender</title>
+  <title>CorridorKey Studio - Desktop Chroma Keying Workstation</title>
+  <link rel="icon" type="image/png" href="gui/icon.png">
   <style>
-    body {
-      background: #141414;
-      color: #dcdcdc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
-      margin: 0;
-      padding: 30px 20px 60px;
-      line-height: 1.5;
+    :root {
+      --bg: #000000;
+      --card-bg: #0a0a0a;
+      --border: #1e1e1e;
+      --border-light: #2c2c2c;
+      --text: #e0e0e0;
+      --text-muted: #888888;
+      --accent: #2e7d32;
+      --accent-hover: #388e3c;
+      --accent-border: #4caf50;
+      --font-mono: "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.55;
+      padding: 36px 20px 80px;
+    }
+
     .container {
-      max-width: 720px;
+      max-width: 860px;
       margin: 0 auto;
     }
-    h1 {
-      font-size: 1.6rem;
-      color: #ffffff;
-      margin-bottom: 4px;
+
+    header {
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .app-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: #111111;
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-size: 1.55rem;
       font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.3px;
     }
-    .tagline {
-      color: #888888;
+
+    .header-text .tagline {
       font-size: 0.95rem;
-      margin-bottom: 24px;
+      color: var(--text-muted);
     }
+
     .box {
-      background: #1e1e1e;
-      border: 1px solid #333333;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 16px 20px;
+      padding: 20px;
       margin-bottom: 24px;
     }
-    .download-row {
+
+    .download-bar {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin: 14px 0 6px;
+      margin: 14px 0 10px;
     }
+
     .btn {
       display: inline-block;
-      background: #2b5c3b;
-      color: #ffffff;
-      padding: 9px 16px;
-      border-radius: 3px;
+      background: #1b3d26;
+      color: #9be9a8;
+      border: 1px solid #2d6b41;
+      padding: 10px 18px;
+      border-radius: 4px;
       text-decoration: none;
-      font-size: 0.9rem;
       font-weight: 600;
-      border: 1px solid #3c7d52;
+      font-size: 0.92rem;
+      transition: background 0.15s, border-color 0.15s;
     }
+
     .btn:hover {
-      background: #347248;
-    }
-    .btn-secondary {
-      background: #282828;
-      border-color: #444444;
-      color: #cccccc;
-    }
-    .btn-secondary:hover {
-      background: #333333;
-    }
-    h2 {
-      font-size: 1.15rem;
+      background: #234f31;
+      border-color: #388452;
       color: #ffffff;
-      margin: 28px 0 10px;
-      border-bottom: 1px solid #2a2a2a;
-      padding-bottom: 4px;
     }
+
+    .btn-secondary {
+      background: #161616;
+      border-color: #282828;
+      color: #dcdcdc;
+    }
+
+    .btn-secondary:hover {
+      background: #222222;
+      border-color: #3a3a3a;
+      color: #ffffff;
+    }
+
+    .screenshot-frame {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 22px 0 28px;
+      background: #050505;
+    }
+
+    .screenshot-frame img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .screenshot-caption {
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      background: #090909;
+      font-family: var(--font-mono);
+    }
+
+    h2 {
+      font-size: 1.18rem;
+      color: #ffffff;
+      margin: 32px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: -0.2px;
+    }
+
     p {
       margin-bottom: 12px;
-      font-size: 0.95rem;
-      color: #bbbbbb;
+      font-size: 0.93rem;
+      color: #cccccc;
     }
-    ul, ol {
-      margin-left: 20px;
-      margin-bottom: 16px;
-      color: #bbbbbb;
-      font-size: 0.95rem;
+
+    .steps {
+      counter-reset: step-counter;
+      list-style: none;
+      margin: 14px 0 20px;
     }
-    li {
-      margin-bottom: 6px;
+
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 36px;
+      margin-bottom: 14px;
+      font-size: 0.93rem;
+      color: #cccccc;
     }
-    code, pre {
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 0.88rem;
-      background: #0a0a0a;
-      color: #9cdcfe;
+
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 24px;
+      height: 24px;
+      background: #141414;
+      border: 1px solid var(--border-light);
+      border-radius: 50%;
+      text-align: center;
+      line-height: 22px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #9be9a8;
+      font-family: var(--font-mono);
     }
-    code {
-      padding: 2px 5px;
-      border-radius: 3px;
+
+    .steps strong {
+      color: #ffffff;
     }
-    pre {
-      padding: 10px 14px;
-      border: 1px solid #222222;
-      border-radius: 4px;
-      overflow-x: auto;
-      margin: 12px 0 16px;
-    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
-      margin: 12px 0 18px;
+      font-size: 0.88rem;
+      margin: 14px 0 20px;
     }
+
     th, td {
-      border: 1px solid #2e2e2e;
+      border: 1px solid var(--border);
       padding: 8px 12px;
       text-align: left;
     }
+
     th {
-      background: #1a1a1a;
+      background: #0f0f0f;
       color: #ffffff;
+      font-weight: 600;
     }
+
+    td {
+      background: #060606;
+      color: #bbbbbb;
+    }
+
     td:first-child {
-      color: #888888;
-      width: 140px;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
     }
+
+    pre, code {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    code {
+      background: #121212;
+      padding: 2px 5px;
+      border-radius: 3px;
+      color: #a8d5fe;
+      border: 1px solid #1e1e1e;
+    }
+
+    pre {
+      background: #080808;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      margin: 12px 0 16px;
+      color: #9cdcfe;
+    }
+
     a {
-      color: #58a6ff;
+      color: #60a5fa;
       text-decoration: none;
     }
+
     a:hover {
       text-decoration: underline;
     }
+
     .footer {
-      margin-top: 40px;
-      padding-top: 14px;
-      border-top: 1px solid #222222;
+      margin-top: 48px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
       font-size: 0.82rem;
       color: #666666;
     }
@@ -138,83 +261,147 @@
 </head>
 <body>
   <div class="container">
-    <h1>CorridorKey Studio</h1>
-    <div class="tagline">simple desktop tool for CorridorKey 2.0 green screen cutouts</div>
+    <header>
+      <img src="gui/icon.png" alt="CorridorKey Studio Icon" class="app-icon">
+      <div class="header-text">
+        <h1>Corridorkey Studio</h1>
+        <div class="tagline">Desktop workstation for CorridorKey 2.0 green and blue screen keying</div>
+      </div>
+    </header>
 
     <div class="box">
-      <strong>Get the installer:</strong>
-      <div class="download-row">
+      <p style="margin-bottom: 6px; font-weight: 600; color: #ffffff;">Download standalone installer:</p>
+      <div class="download-bar">
         <a href="CorridorKey-Studio-Installer-Linux" download="CorridorKey-Studio-Installer-Linux" class="btn">Download for Linux (Installer)</a>
         <a href="CorridorKey-Studio-Setup.exe" download="CorridorKey-Studio-Setup.exe" class="btn btn-secondary">Download for Windows (.exe)</a>
       </div>
-      <p style="margin-top: 10px; font-size: 0.85rem; color: #888888; margin-bottom: 0;">
-        Or clone and run the dedicated platform branch:
+      <p style="margin-top: 10px; font-size: 0.83rem; color: #777777; margin-bottom: 0;">
+        Standalone installers auto-detect your GPU, pick the drive with the most space, download model weights, and set up desktop shortcuts.
       </p>
-      <pre># Linux:
+    </div>
+
+    <div class="screenshot-frame">
+      <img src="screenshot.png" alt="CorridorKey Studio desktop interface with footage loaded and split preview">
+      <div class="screenshot-caption">
+        CorridorKey Studio in action: live split preview, video timeline scrubber, transport controls, and one-click deliverables.
+      </div>
+    </div>
+
+    <h2>How to use</h2>
+    <ol class="steps">
+      <li>
+        <strong>Drop your footage:</strong> Drag an MP4, MOV, or image sequence folder into the drop area. The app reads video dimensions, frame count, and checks for companion hint files automatically.
+      </li>
+      <li>
+        <strong>Pick a workflow preset:</strong> Select <code>Balanced Studio</code> for standard shots, <code>Maximum Quality</code> for thin hair strands and motion blur, or <code>Low-VRAM Staged</code> if working on a 4GB or 6GB GPU.
+      </li>
+      <li>
+        <strong>Preview and scrub:</strong> Drag the split handle on the canvas to inspect the matte against the green background. Hit Spacebar or the play button to scrub through frames and check temporal consistency.
+      </li>
+      <li>
+        <strong>Choose export deliverable:</strong> Pick transparent ProRes 4444 RGBA, a PNG frame sequence, an OpenEXR sequence, or a DaVinci Resolve matte pack.
+      </li>
+      <li>
+        <strong>Click Start Keying:</strong> The engine processes the clip with Hann windowing and despills edge reflections. If selected, an auto-wiring <code>import_to_blender.py</code> script is saved next to your output video.
+      </li>
+    </ol>
+
+    <h2>Export deliverables</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Deliverable</th>
+          <th>Codec / Container</th>
+          <th>Target Pipeline</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Blender ProRes 4444</td>
+          <td>.mov (prores_ks, 10-bit RGBA)</td>
+          <td>Blender compositor & image plane cards (includes auto-wiring script)</td>
+        </tr>
+        <tr>
+          <td>Blender PNG Sequence</td>
+          <td>.png (Numbered RGBA frames)</td>
+          <td>Blender image sequences, Cycles, and Eevee cards</td>
+        </tr>
+        <tr>
+          <td>DaVinci Resolve Pack</td>
+          <td>Dual .mov (ProRes 422 HQ Fill + Matte)</td>
+          <td>External Matte node workflow in DaVinci Resolve</td>
+        </tr>
+        <tr>
+          <td>WebM VP9 RGBA</td>
+          <td>.webm (libvpx-vp9, yuva420p)</td>
+          <td>OBS Studio streaming, browser overlays, Godot and Unity engines</td>
+        </tr>
+        <tr>
+          <td>QuickTime Animation</td>
+          <td>.mov (qtrle, Lossless RGBA)</td>
+          <td>After Effects and Premiere Pro uncompressed timelines</td>
+        </tr>
+        <tr>
+          <td>OpenEXR Sequence</td>
+          <td>.exr (32-bit float)</td>
+          <td>ACES color management and VFX composite graphs</td>
+        </tr>
+        <tr>
+          <td>TIFF 16-bit Sequence</td>
+          <td>.tif (rgba64le)</td>
+          <td>Nuke, Fusion, and high bit-depth archival</td>
+        </tr>
+        <tr>
+          <td>Standard Passes</td>
+          <td>Dual .mp4 (Despilled FG + Alpha)</td>
+          <td>Quick previews and custom shader inputs</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Hardware notes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Requirement</th>
+          <th>Specification</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>GPU</td>
+          <td>NVIDIA GeForce or RTX GPU with CUDA support.</td>
+        </tr>
+        <tr>
+          <td>VRAM</td>
+          <td>4 GB minimum. The app monitors memory usage and switches to staged inference with smaller frame chunks so 1080p clips do not trigger CUDA out-of-memory errors on 4GB-6GB cards.</td>
+        </tr>
+        <tr>
+          <td>Software</td>
+          <td>ffmpeg must be installed on your system.</td>
+        </tr>
+        <tr>
+          <td>Branch Updates</td>
+          <td>Linux installations track and update from <code>app-linux</code>. Windows installations track and update from <code>app-win</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Run from source</h2>
+    <pre># Linux:
 git clone -b app-linux https://github.com/Yancovert/CorridorKey-Studio.git
 cd CorridorKey-Studio && ./CorridorKey-Studio-Installer-Linux
 
 # Windows:
-git clone -b app-win https://github.com/Yancovert/CorridorKey-Studio.git</pre>
-    </div>
-
-    <h2>What is this?</h2>
-    <p>
-      Corridor Digital recently made their CorridorKey 2.0 model open source on GitHub. It pulls clean green and blue screen mattes using neural networks without cutting off hair, motion blur, or semi-transparent edges.
-    </p>
-    <p>
-      The catch is that the repo only comes with python terminal scripts. If you just want to key a video for a 3D scene in Blender, typing long command line arguments every single time gets tedious fast.
-    </p>
-    <p>
-      This is a simple desktop app wrapper around it. You get a basic window with:
-    </p>
-    <ul>
-      <li>Drag and drop support for MP4, MOV, and image sequences.</li>
-      <li>Side-by-side split slider to preview original footage vs. transparent cutouts.</li>
-      <li>Automatic memory tuning so smaller 4GB cards don't crash with CUDA out-of-memory errors.</li>
-      <li>One-click Blender export presets (transparent ProRes 4444, PNG sequences, and an auto-generated Blender compositor script).</li>
-    </ul>
-
-    <h2>Quick install guide</h2>
-    <ol>
-      <li>Download the installer for your OS (<code>CorridorKey-Studio-Installer-Linux</code> or <code>CorridorKey-Studio-Setup.exe</code>).</li>
-      <li>Run it. The installer checks your GPU, auto-detects the drive with the most free space for weights, sets up dependencies, and creates a desktop shortcut.</li>
-      <li>Once finished, launch the app directly or via <code>./launch_gui.sh</code> (Linux) / <code>launch_gui.bat</code> (Windows).</li>
-    </ol>
-
-    <h2>Hardware notes</h2>
-    <table>
-      <tr>
-        <td>GPU</td>
-        <td>NVIDIA RTX card with CUDA (tested on RTX 3050 mobile, 3060, 40-series).</td>
-      </tr>
-      <tr>
-        <td>VRAM</td>
-        <td>4 GB minimum. The app auto-detects 4GB cards and switches to staged low-VRAM mode with small frame chunks so 1080p and 4K footage don't crash.</td>
-      </tr>
-      <tr>
-        <td>Other</td>
-        <td><code>ffmpeg</code> must be installed on your system.</td>
-      </tr>
-    </table>
-
-    <h2>Blender workflow</h2>
-    <p>
-      In the app, pick one of the Blender presets:
-    </p>
-    <ul>
-      <li><strong>ProRes 4444 RGBA:</strong> Exports a single transparent video file that drops right into Blender's compositor or video sequencer.</li>
-      <li><strong>PNG Sequence:</strong> Exports numbered transparent frames, handy for mapping onto 3D planes/cards in Cycles and Eevee.</li>
-      <li><strong>OpenEXR:</strong> 32-bit linear floating point frames for VFX lighting integration.</li>
-    </ul>
-    <p>
-      If you leave "Auto-Generate Blender Compositor Script" checked, it drops a small <code>import_to_blender.py</code> script next to your output video. Running that script inside Blender automatically sets up the compositor node graph for you.
-    </p>
+git clone -b app-win https://github.com/Yancovert/CorridorKey-Studio.git
+cd CorridorKey-Studio && CorridorKey-Studio-Setup.exe</pre>
 
     <div class="footer">
-      Based on CorridorKey 2.0 by Zachary Harris, Niko Pueringer, and Corridor Digital.
+      CorridorKey 2.0 neural model trained by Zachary Harris in direct collaboration with Niko and Corridor Digital.
       <br>
-      Source code and updates on <a href="https://github.com/Yancovert/CorridorKey-Studio">GitHub</a>.
+      Official commercial plugin and standalone app available at <a href="https://corridorkey.com" target="_blank" rel="noopener">corridorkey.com</a>.
+      <br>
+      CorridorKey Studio source code on <a href="https://github.com/Yancovert/CorridorKey-Studio" target="_blank" rel="noopener">GitHub</a>.
     </div>
   </div>
 </body>
