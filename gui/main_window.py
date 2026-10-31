@@ -297,15 +297,21 @@ class MainWindow(QMainWindow):
         self.update_progress_bar = QProgressBar()
         self.update_progress_bar.setRange(0, 100)
         self.update_progress_bar.setValue(0)
-        self.update_progress_bar.setFixedWidth(140)
-        self.update_progress_bar.setFixedHeight(6)
-        self.update_progress_bar.setTextVisible(False)
+        self.update_progress_bar.setMinimumWidth(220)
+        self.update_progress_bar.setMaximumWidth(360)
+        self.update_progress_bar.setFixedHeight(16)
+        self.update_progress_bar.setTextVisible(True)
+        self.update_progress_bar.setFormat("%p%")
         self.update_progress_bar.setVisible(False)
         self.update_progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #161b22;
-                border: 1px solid #21262d;
+                background-color: #0b0f13;
+                border: 1px solid #1e2630;
                 border-radius: 3px;
+                text-align: center;
+                color: #e6edf3;
+                font-size: 10px;
+                font-weight: 700;
             }
             QProgressBar::chunk {
                 background-color: #238636;
@@ -1592,8 +1598,15 @@ class MainWindow(QMainWindow):
 
         self.btn_update_now.setEnabled(False)
         self.btn_update_now.setText("Updating...")
+        self.btn_update_dismiss.setEnabled(False)
+        self.update_badge.setText("UPDATING")
+        self.update_badge.setStyleSheet(
+            "background-color: #153248; color: #58a6ff; font-size: 10px; font-weight: 700; "
+            "padding: 2px 6px; border-radius: 3px; border: none;"
+        )
+        self.update_label.setText("Starting update...")
         self.update_progress_bar.setVisible(True)
-        self.update_progress_bar.setValue(10)
+        self.update_progress_bar.setValue(5)
         repo_root = Path(__file__).resolve().parents[1]
         self.update_installer = UpdateInstallWorker(repo_root, self.pending_update_branch, self.pending_update_commit)
         self.update_installer.progress.connect(self._on_update_progress)
@@ -1607,8 +1620,9 @@ class MainWindow(QMainWindow):
 
     @Slot(bool, str)
     def _on_update_finished(self, success: bool, message: str):
-        self.update_progress_bar.setVisible(False)
         if success:
+            self.update_progress_bar.setValue(100)
+            self.update_progress_bar.setVisible(True)
             self.update_badge.setText("READY")
             self.update_badge.setStyleSheet(
                 "background-color: #1a3824; color: #7ee787; font-size: 10px; font-weight: 700; "
@@ -1625,6 +1639,7 @@ class MainWindow(QMainWindow):
             self.btn_update_dismiss.setText("Later")
             self.btn_update_dismiss.setEnabled(True)
         else:
+            self.update_progress_bar.setVisible(False)
             self.update_badge.setText("ERROR")
             self.update_badge.setStyleSheet(
                 "background-color: #3b1818; color: #ff7b72; font-size: 10px; font-weight: 700; "
