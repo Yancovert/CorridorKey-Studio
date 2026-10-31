@@ -38,7 +38,7 @@ class KeyerEngineWorker(QThread):
         start_mode: str = "begin",
         stage2_batch: int = 1,
         low_vram_foundation_chunk: int = 4,
-        low_vram_swin_window_batch: int = 16,
+        low_vram_swin_window_batch: int = 4,
         carry_hint: bool = True,
         hint_quality: float = 0.95,
         cutout_linear: bool = False,
@@ -140,6 +140,7 @@ class KeyerEngineWorker(QThread):
         self.preset = preset
         self.bitrate = bitrate
         self.ffmpeg_threads = ffmpeg_threads
+        self.cuda_device_index = kwargs.get("cuda_device_index")
 
         self._process: subprocess.Popen | None = None
         self._is_cancelled = False
@@ -276,7 +277,7 @@ class KeyerEngineWorker(QThread):
                 cmd.extend(["--seed", str(self.seed)])
             if abs(self.carry_hint_quality - 0.95) > 1e-4:
                 cmd.extend(["--carry_hint_quality", str(self.carry_hint_quality)])
-            if abs(self.linear_brightness - 1.0) > 1e-4:
+            if abs(self.linear_brightness - 1.0) > 1e-4 and self.linear_brightness > 0.05:
                 cmd.extend(["--linear_brightness", str(self.linear_brightness)])
             if self.frame_dir_fps != 24.0:
                 cmd.extend(["--frame_dir_fps", str(self.frame_dir_fps)])
@@ -306,6 +307,10 @@ class KeyerEngineWorker(QThread):
 
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
+            env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+            if self.cuda_device_index is not None:
+                env["CUDA_VISIBLE_DEVICES"] = str(self.cuda_device_index)
+                self._emit_log(f"targeting CUDA accelerator device index: {self.cuda_device_index}")
 
             popen_kwargs = {
                 "stdout": subprocess.PIPE,

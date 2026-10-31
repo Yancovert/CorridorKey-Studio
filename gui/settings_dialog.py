@@ -17,13 +17,15 @@ from .settings_manager import (
     load_settings, save_settings, list_custom_presets,
     save_custom_preset, load_custom_preset, delete_custom_preset
 )
-from .gpu_info import GpuProfile
+from .gpu_info import (
+    GpuProfile, SystemGpuDevice, enumerate_system_gpus, get_gpu_dropdown_options
+)
 
 
 class SettingsDialog(QDialog):
     settings_applied = Signal(dict)
 
-    def __init__(self, parent: QWidget | None, gpu_profile: GpuProfile, app_root: Path, current_state: dict):
+    def __init__(self, parent: QWidget | None, gpu_profile: GpuProfile, app_root: Path, current_state: dict, system_gpus: list[SystemGpuDevice] | None = None):
         super().__init__(parent)
         self.setWindowTitle("CorridorKey Studio - Settings")
         self.resize(720, 740)
@@ -31,6 +33,7 @@ class SettingsDialog(QDialog):
         self.gpu_profile = gpu_profile
         self.app_root = app_root
         self.current_state = current_state
+        self.system_gpus = system_gpus or enumerate_system_gpus()
 
         self._setup_theme()
         self._setup_ui()
@@ -191,6 +194,21 @@ class SettingsDialog(QDialog):
         hw_layout = QVBoxLayout(hw_group)
         hw_layout.setSpacing(10)
 
+        row_gpu = QHBoxLayout()
+        row_gpu.addWidget(QLabel("Compute GPU:"))
+        self.combo_gpu = QComboBox()
+        self.combo_gpu.setMinimumWidth(260)
+        for label, dev_id, is_compat, cuda_idx in get_gpu_dropdown_options(self.system_gpus):
+            self.combo_gpu.addItem(label, userData={"id": dev_id, "compat": is_compat, "cuda_idx": cuda_idx})
+        self.combo_gpu.currentIndexChanged.connect(self._on_gpu_changed)
+        row_gpu.addWidget(self.combo_gpu, stretch=1)
+        hw_layout.addLayout(row_gpu)
+
+        self.lbl_gpu_warn = QLabel("")
+        self.lbl_gpu_warn.setStyleSheet("color: #f85149; font-size: 11px; padding: 2px 0;")
+        self.lbl_gpu_warn.setVisible(False)
+        hw_layout.addWidget(self.lbl_gpu_warn)
+
         self.chk_low_vram = QCheckBox("Low-VRAM Staged Inference")
         hw_layout.addWidget(self.chk_low_vram)
 
@@ -290,11 +308,11 @@ class SettingsDialog(QDialog):
         color_layout.addLayout(row_contrast)
 
         row_bright = QHBoxLayout()
-        row_bright.addWidget(QLabel("Brightness Offset:"))
+        row_bright.addWidget(QLabel("Brightness Multiplier:"))
         self.spin_bright = QDoubleSpinBox()
-        self.spin_bright.setRange(-1.0, 1.0)
+        self.spin_bright.setRange(0.1, 2.5)
         self.spin_bright.setSingleStep(0.05)
-        self.spin_bright.setValue(0.0)
+        self.spin_bright.setValue(1.0)
         row_bright.addWidget(self.spin_bright)
         color_layout.addLayout(row_bright)
 
@@ -406,6 +424,13 @@ class SettingsDialog(QDialog):
             self.btn_delete_preset.setEnabled(False)
 
     def _load_initial_values(self, state: dict):
+        if "selected_gpu" in state:
+            target_id = str(state["selected_gpu"])
+            for i in range(self.combo_gpu.count()):
+                d = self.combo_gpu.itemData(i) or {}
+                if d.get("id") == target_id:
+                    self.combo_gpu.setCurrentIndex(i)
+                    break
         self.chk_low_vram.setChecked(state.get("low_vram", self.gpu_profile.recommended_low_vram))
         self.spin_scale.setValue(float(state.get("scale", 1.0)))
         self.spin_chunk.setValue(int(state.get("chunk", self.gpu_profile.recommended_chunk)))
@@ -424,7 +449,8 @@ class SettingsDialog(QDialog):
         self.chk_linear.setChecked(bool(state.get("linear", True)))
         self.spin_despill.setValue(float(state.get("despill", 0.50)))
         self.spin_contrast.setValue(float(state.get("contrast", 1.0)))
-        self.spin_bright.setValue(float(state.get("bright", 0.0)))
+        bright_val = float(state.get("bright", 1.0))
+        self.spin_bright.setValue(1.0 if bright_val <= 0.05 else bright_val)
 
         deliv_val = str(state.get("deliverable", "ProRes 4444 (RGBA)"))
         idx = self.combo_deliverable.findText(deliv_val)
@@ -439,7 +465,11 @@ class SettingsDialog(QDialog):
         self.lbl_outdir.setText(str(state.get("output_dir", "./outputs")))
 
     def _collect_current_dict(self) -> dict:
+        gpu_id = "auto"
+        if hasattr(self, "combo_gpu") and self.combo_gpu.currentData():
+            gpu_id = self.combo_gpu.currentData().get("id", "auto")
         return {
+            "selected_gpu": gpu_id,
             "low_vram": self.chk_low_vram.isChecked(),
             "scale": round(self.spin_scale.value(), 2),
             "chunk": self.spin_chunk.value(),
@@ -464,7 +494,16 @@ class SettingsDialog(QDialog):
         if chosen:
             self.lbl_outdir.setText(chosen)
 
+    def _on_gpu_changed(self, index: int):
+        data = self.combo_gpu.currentData() or {}
+        if not data.get("compat", True):
+            self.lbl_gpu_warn.setText("Selected adapter does not support CUDA. Neural network inference will fail.")
+            self.lbl_gpu_warn.setVisible(True)
+        else:
+            self.lbl_gpu_warn.setVisible(False)
+
     def _on_reset_hardware_defaults(self):
+        self.combo_gpu.setCurrentIndex(0)
         self.chk_low_vram.setChecked(self.gpu_profile.recommended_low_vram)
         self.spin_scale.setValue(1.0)
         self.spin_chunk.setValue(self.gpu_profile.recommended_chunk)
@@ -477,7 +516,7 @@ class SettingsDialog(QDialog):
         self.chk_linear.setChecked(True)
         self.spin_despill.setValue(0.50)
         self.spin_contrast.setValue(1.0)
-        self.spin_bright.setValue(0.0)
+        self.spin_bright.setValue(1.0)
 
     def _on_save_new_preset(self):
         name, ok = QInputDialog.getText(self, "Save Custom Preset", "Enter a name for this preset profile:")
