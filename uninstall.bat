@@ -7,7 +7,7 @@ echo ==========================================
 echo.
 
 set SCRIPT_DIR=%~dp0
-set /p CONFIRM="Are you sure you want to completely uninstall CorridorKey Studio? (Y/N): "
+set /p CONFIRM="Uninstall CorridorKey Studio? (Y/N): "
 if /i not "%CONFIRM%"=="Y" (
     echo Uninstallation cancelled.
     pause
@@ -26,7 +26,7 @@ if exist "%SCRIPT_DIR%venv" rd /s /q "%SCRIPT_DIR%venv"
 
 echo [4/4] Cleaning application files...
 if exist "%SCRIPT_DIR%weights" (
-    set /p RM_WEIGHTS="Also delete downloaded model weights in weights\ (~1.5 GB)? (Y/N): "
+    set /p RM_WEIGHTS="Delete downloaded model weights (~1.5 GB)? (Y/N): "
     if /i "%RM_WEIGHTS%"=="Y" rd /s /q "%SCRIPT_DIR%weights"
 )
 

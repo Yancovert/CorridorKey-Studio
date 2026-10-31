@@ -48,32 +48,30 @@ class SettingsDialog(QDialog):
                 border: none;
             }
             QGroupBox {
-                background-color: #0d1117;
-                border: 1px solid #28303d;
-                border-radius: 6px;
-                margin-top: 20px;
-                padding: 16px 14px 12px 14px;
-                font-weight: 700;
-                font-size: 12px;
-                color: #f0f6fc;
+                background-color: #12151a;
+                border: 1px solid #21262d;
+                border-radius: 5px;
+                margin-top: 16px;
+                padding: 14px 12px 10px 12px;
+                font-weight: 600;
+                font-size: 11.5px;
+                color: #c9d1d9;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                padding: 2px 8px;
-                left: 10px;
-                top: 4px;
-                background-color: #161b22;
-                border: 1px solid #364152;
-                border-radius: 4px;
-                color: #f0f6fc;
-                font-size: 11.5px;
-                font-weight: 700;
+                padding: 0px 6px;
+                left: 8px;
+                top: 2px;
+                background-color: #0b0e14;
+                color: #8b949e;
+                font-size: 11px;
+                font-weight: 600;
             }
             QComboBox, QSpinBox, QDoubleSpinBox {
                 background-color: #161b22;
                 border: 1px solid #30363d;
-                border-radius: 5px;
+                border-radius: 4px;
                 padding: 5px 10px;
                 color: #f0f6fc;
                 font-size: 12px;
@@ -84,15 +82,15 @@ class SettingsDialog(QDialog):
                 background-color: #1c212a;
             }
             QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-                border-color: #58a6ff;
+                border-color: #385175;
             }
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 24px;
                 border-left: 1px solid #30363d;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
                 background-color: #1b212a;
             }
             QComboBox::down-arrow {
@@ -100,7 +98,7 @@ class SettingsDialog(QDialog):
                 height: 0px;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 5px solid #8b949e;
+                border-top: 5px solid #6e7681;
                 margin-right: 2px;
             }
             QComboBox QAbstractItemView {
@@ -108,31 +106,34 @@ class SettingsDialog(QDialog):
                 border: 1px solid #30363d;
                 border-radius: 4px;
                 color: #f0f6fc;
-                selection-background-color: #1f6feb;
+                selection-background-color: #26354a;
                 selection-color: #ffffff;
                 padding: 4px;
             }
             QCheckBox {
-                color: #e6edf3;
+                color: #c9d1d9;
                 font-size: 12px;
                 spacing: 8px;
             }
             QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
+                width: 15px;
+                height: 15px;
                 background-color: #161b22;
                 border: 1px solid #30363d;
-                border-radius: 4px;
+                border-radius: 3px;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #484f58;
             }
             QCheckBox::indicator:checked {
-                background-color: #1f6feb;
-                border-color: #58a6ff;
+                background-color: #27384e;
+                border-color: #3e5677;
             }
             QPushButton {
                 background-color: #161b22;
                 color: #c9d1d9;
                 border: 1px solid #30363d;
-                border-radius: 5px;
+                border-radius: 4px;
                 padding: 6px 14px;
                 font-size: 12px;
                 font-weight: 500;
@@ -160,12 +161,12 @@ class SettingsDialog(QDialog):
         content_layout.setSpacing(16)
 
         # 1. Preset management bar
-        preset_group = QGroupBox("Custom Presets and Profiles")
+        preset_group = QGroupBox("Presets")
         pg_layout = QVBoxLayout(preset_group)
         pg_layout.setSpacing(8)
 
         preset_row = QHBoxLayout()
-        preset_row.addWidget(QLabel("Saved Presets:"))
+        preset_row.addWidget(QLabel("Preset:"))
         self.preset_combo = QComboBox()
         self.preset_combo.setMinimumWidth(220)
         preset_row.addWidget(self.preset_combo, stretch=1)
@@ -186,15 +187,15 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(preset_group)
 
         # 2. Hardware and tuning
-        hw_group = QGroupBox("Hardware and Inference Windows")
+        hw_group = QGroupBox("Inference")
         hw_layout = QVBoxLayout(hw_group)
         hw_layout.setSpacing(10)
 
-        self.chk_low_vram = QCheckBox("Enable Low-VRAM Staged Inference (Recommended for 4GB - 6GB GPUs)")
+        self.chk_low_vram = QCheckBox("Low-VRAM Staged Inference")
         hw_layout.addWidget(self.chk_low_vram)
 
         row_scale = QHBoxLayout()
-        row_scale.addWidget(QLabel("Default Model Scale:"))
+        row_scale.addWidget(QLabel("Model Scale:"))
         self.spin_scale = QDoubleSpinBox()
         self.spin_scale.setRange(0.25, 2.0)
         self.spin_scale.setSingleStep(0.05)
@@ -203,49 +204,49 @@ class SettingsDialog(QDialog):
         hw_layout.addLayout(row_scale)
 
         row_chunk = QHBoxLayout()
-        row_chunk.addWidget(QLabel("Hann Window Chunk:"))
+        row_chunk.addWidget(QLabel("Window Chunk:"))
         self.spin_chunk = QSpinBox()
         self.spin_chunk.setRange(1, 192)
         row_chunk.addWidget(self.spin_chunk)
         hw_layout.addLayout(row_chunk)
 
         row_stride = QHBoxLayout()
-        row_stride.addWidget(QLabel("Hann Overlap Stride:"))
+        row_stride.addWidget(QLabel("Window Stride:"))
         self.spin_stride = QSpinBox()
         self.spin_stride.setRange(1, 96)
         row_stride.addWidget(self.spin_stride)
         hw_layout.addLayout(row_stride)
 
         row_anchor = QHBoxLayout()
-        row_anchor.addWidget(QLabel("Processing Anchor:"))
+        row_anchor.addWidget(QLabel("Anchor:"))
         self.combo_anchor = QComboBox()
-        self.combo_anchor.addItems(["begin (Frame 0 -> N)", "middle (Center -> Edges)", "random_middle"])
+        self.combo_anchor.addItems(["begin", "middle", "random_middle"])
         row_anchor.addWidget(self.combo_anchor)
         hw_layout.addLayout(row_anchor)
 
         content_layout.addWidget(hw_group)
 
         # 3. Throughput and batch concurrency
-        perf_group = QGroupBox("Throughput and Concurrency")
+        perf_group = QGroupBox("Performance")
         perf_layout = QVBoxLayout(perf_group)
         perf_layout.setSpacing(10)
 
         row_stage2 = QHBoxLayout()
-        row_stage2.addWidget(QLabel("Stage-2 Output Batch:"))
+        row_stage2.addWidget(QLabel("Stage-2 Batch:"))
         self.spin_stage2 = QSpinBox()
         self.spin_stage2.setRange(1, 8)
         row_stage2.addWidget(self.spin_stage2)
         perf_layout.addLayout(row_stage2)
 
         row_found = QHBoxLayout()
-        row_found.addWidget(QLabel("Foundation Model Chunk:"))
+        row_found.addWidget(QLabel("Foundation Chunk:"))
         self.spin_found = QSpinBox()
         self.spin_found.setRange(2, 32)
         row_found.addWidget(self.spin_found)
         perf_layout.addLayout(row_found)
 
         row_swin = QHBoxLayout()
-        row_swin.addWidget(QLabel("Swin Attention Window Batch:"))
+        row_swin.addWidget(QLabel("Swin Batch:"))
         self.spin_swin = QSpinBox()
         self.spin_swin.setRange(8, 128)
         self.spin_swin.setSingleStep(8)
@@ -253,7 +254,7 @@ class SettingsDialog(QDialog):
         perf_layout.addLayout(row_swin)
 
         row_threads = QHBoxLayout()
-        row_threads.addWidget(QLabel("FFmpeg Worker Threads (0 = Auto):"))
+        row_threads.addWidget(QLabel("Worker Threads (0 = auto):"))
         self.spin_threads = QSpinBox()
         self.spin_threads.setRange(0, 32)
         row_threads.addWidget(self.spin_threads)
@@ -262,16 +263,16 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(perf_group)
 
         # 4. Color and Despill defaults
-        color_group = QGroupBox("Color Space and Keying Defaults")
+        color_group = QGroupBox("Color")
         color_layout = QVBoxLayout(color_group)
         color_layout.setSpacing(10)
 
-        self.chk_linear = QCheckBox("Enable Linear Color Space Keying")
+        self.chk_linear = QCheckBox("Linear Color Space Keying")
         self.chk_linear.setChecked(True)
         color_layout.addWidget(self.chk_linear)
 
         row_despill = QHBoxLayout()
-        row_despill.addWidget(QLabel("Default Despill Strength:"))
+        row_despill.addWidget(QLabel("Despill Strength:"))
         self.spin_despill = QDoubleSpinBox()
         self.spin_despill.setRange(0.0, 1.0)
         self.spin_despill.setSingleStep(0.05)
@@ -280,7 +281,7 @@ class SettingsDialog(QDialog):
         color_layout.addLayout(row_despill)
 
         row_contrast = QHBoxLayout()
-        row_contrast.addWidget(QLabel("Default Contrast Multiplier:"))
+        row_contrast.addWidget(QLabel("Contrast Multiplier:"))
         self.spin_contrast = QDoubleSpinBox()
         self.spin_contrast.setRange(0.1, 2.0)
         self.spin_contrast.setSingleStep(0.05)
@@ -289,7 +290,7 @@ class SettingsDialog(QDialog):
         color_layout.addLayout(row_contrast)
 
         row_bright = QHBoxLayout()
-        row_bright.addWidget(QLabel("Default Brightness Offset:"))
+        row_bright.addWidget(QLabel("Brightness Offset:"))
         self.spin_bright = QDoubleSpinBox()
         self.spin_bright.setRange(-1.0, 1.0)
         self.spin_bright.setSingleStep(0.05)
@@ -300,32 +301,32 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(color_group)
 
         # 5. Deliverables & Output
-        export_group = QGroupBox("Deliverables and Outputs")
+        export_group = QGroupBox("Export")
         export_layout = QVBoxLayout(export_group)
         export_layout.setSpacing(10)
 
         row_deliv = QHBoxLayout()
-        row_deliv.addWidget(QLabel("Default Format:"))
+        row_deliv.addWidget(QLabel("Format:"))
         self.combo_deliverable = QComboBox()
         self.combo_deliverable.addItems([
-            "Blender: ProRes 4444 RGBA (Transparent Video)",
-            "Blender: PNG Sequence (Transparent Frames)",
-            "WebM: VP9 RGBA (Transparent Web Video)",
-            "QuickTime: Animation RLE (Lossless RGBA)",
-            "TIFF Sequence 16-bit (High Depth Archival)",
-            "DaVinci Resolve Matte Pack (Fill + External Matte)",
-            "OpenEXR Sequence (Linear 32-bit Float)",
-            "Standard Separate Passes (FG + Alpha MP4)",
+            "ProRes 4444 (RGBA)",
+            "PNG Sequence (RGBA)",
+            "WebM VP9 (RGBA)",
+            "QuickTime RLE (RGBA)",
+            "TIFF 16-bit (RGBA)",
+            "Matte Pack (Fill + Matte)",
+            "OpenEXR 32-bit (RGBA)",
+            "Separate Passes (FG + Alpha)",
         ])
         row_deliv.addWidget(self.combo_deliverable)
         export_layout.addLayout(row_deliv)
 
-        self.chk_blender_script = QCheckBox("Generate Blender Compositor Script (import_to_blender.py)")
+        self.chk_blender_script = QCheckBox("Generate Blender import script")
         self.chk_blender_script.setChecked(True)
         export_layout.addWidget(self.chk_blender_script)
 
         row_out = QHBoxLayout()
-        row_out.addWidget(QLabel("Default Output Directory:"))
+        row_out.addWidget(QLabel("Output Directory:"))
         self.lbl_outdir = QLabel("./outputs")
         self.lbl_outdir.setStyleSheet("color: #8b949e; font-family: monospace; font-size: 11px;")
         btn_browse_out = QPushButton("Change...")
@@ -337,20 +338,20 @@ class SettingsDialog(QDialog):
         content_layout.addWidget(export_group)
 
         # 6. Maintenance & Uninstaller
-        maint_group = QGroupBox("Application and Maintenance")
+        maint_group = QGroupBox("Maintenance")
         maint_layout = QVBoxLayout(maint_group)
         maint_layout.setSpacing(8)
 
-        lbl_app_path = QLabel(f"Installation: {self.app_root}")
+        lbl_app_path = QLabel(f"Directory: {self.app_root}")
         lbl_app_path.setStyleSheet("color: #8b949e; font-size: 11px; font-family: monospace;")
         maint_layout.addWidget(lbl_app_path)
 
         maint_row = QHBoxLayout()
-        btn_uninstall = QPushButton("Uninstall CorridorKey Studio...")
+        btn_uninstall = QPushButton("Uninstall...")
         btn_uninstall.setStyleSheet(
-            "QPushButton { background-color: #211214; color: #ff7b72; border: 1px solid #6e2729; "
-            "padding: 6px 14px; font-weight: 600; border-radius: 5px; } "
-            "QPushButton:hover { background-color: #3b181a; border-color: #f85149; color: #ffffff; }"
+            "QPushButton { background-color: #1a1616; color: #c98888; border: 1px solid #3d2626; "
+            "padding: 5px 14px; font-weight: 500; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #281e1e; border-color: #5a3030; color: #f0f6fc; }"
         )
         btn_uninstall.clicked.connect(self._on_click_uninstall)
         maint_row.addWidget(btn_uninstall)
@@ -367,7 +368,7 @@ class SettingsDialog(QDialog):
         btn_bar = QHBoxLayout()
         btn_bar.setSpacing(8)
 
-        btn_reset_hw = QPushButton("Reset to Hardware Optimal")
+        btn_reset_hw = QPushButton("Reset Defaults")
         btn_reset_hw.clicked.connect(self._on_reset_hardware_defaults)
         btn_bar.addWidget(btn_reset_hw)
 
@@ -377,15 +378,15 @@ class SettingsDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         btn_bar.addWidget(btn_cancel)
 
-        btn_apply = QPushButton("Apply to Current Session")
+        btn_apply = QPushButton("Apply")
         btn_apply.clicked.connect(self._on_apply_current)
         btn_bar.addWidget(btn_apply)
 
-        btn_save_default = QPushButton("Save as App Default")
+        btn_save_default = QPushButton("Save Default")
         btn_save_default.setStyleSheet(
-            "QPushButton { background-color: #238636; color: #ffffff; font-weight: 700; "
-            "border: 1px solid #3fb950; border-radius: 5px; padding: 6px 16px; } "
-            "QPushButton:hover { background-color: #2ea043; }"
+            "QPushButton { background-color: #26354a; color: #f0f6fc; font-weight: 600; "
+            "border: 1px solid #385175; border-radius: 4px; padding: 6px 16px; } "
+            "QPushButton:hover { background-color: #314460; border-color: #466794; }"
         )
         btn_save_default.clicked.connect(self._on_save_as_default)
         btn_bar.addWidget(btn_save_default)
@@ -409,7 +410,11 @@ class SettingsDialog(QDialog):
         self.spin_scale.setValue(float(state.get("scale", 1.0)))
         self.spin_chunk.setValue(int(state.get("chunk", self.gpu_profile.recommended_chunk)))
         self.spin_stride.setValue(int(state.get("stride", self.gpu_profile.recommended_stride)))
-        self.combo_anchor.setCurrentText(str(state.get("start_mode", "begin (Frame 0 -> N)")))
+        anchor_val = str(state.get("start_mode", "begin")).split()[0]
+        for i in range(self.combo_anchor.count()):
+            if self.combo_anchor.itemText(i) == anchor_val:
+                self.combo_anchor.setCurrentIndex(i)
+                break
 
         self.spin_stage2.setValue(int(state.get("stage2_batch", self.gpu_profile.recommended_stage2_batch)))
         self.spin_found.setValue(int(state.get("foundation_chunk", self.gpu_profile.recommended_foundation_chunk)))
@@ -421,7 +426,15 @@ class SettingsDialog(QDialog):
         self.spin_contrast.setValue(float(state.get("contrast", 1.0)))
         self.spin_bright.setValue(float(state.get("bright", 0.0)))
 
-        self.combo_deliverable.setCurrentText(str(state.get("deliverable", "Blender: ProRes 4444 RGBA (Transparent Video)")))
+        deliv_val = str(state.get("deliverable", "ProRes 4444 (RGBA)"))
+        idx = self.combo_deliverable.findText(deliv_val)
+        if idx >= 0:
+            self.combo_deliverable.setCurrentIndex(idx)
+        else:
+            for i in range(self.combo_deliverable.count()):
+                if "ProRes" in deliv_val and "ProRes" in self.combo_deliverable.itemText(i):
+                    self.combo_deliverable.setCurrentIndex(i)
+                    break
         self.chk_blender_script.setChecked(bool(state.get("blender_script", True)))
         self.lbl_outdir.setText(str(state.get("output_dir", "./outputs")))
 
@@ -516,9 +529,8 @@ class SettingsDialog(QDialog):
     def _on_click_uninstall(self):
         reply = QMessageBox.warning(
             self, "Uninstall CorridorKey Studio",
-            "Are you sure you want to completely uninstall CorridorKey Studio?\n\n"
-            "This will remove desktop shortcuts, virtual environment, and application files.\n"
-            "You can choose whether to keep downloaded model weights.",
+            "Uninstall CorridorKey Studio?\n\n"
+            "This removes shortcuts, virtual environment, and application files.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:

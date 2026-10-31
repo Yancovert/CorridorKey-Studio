@@ -144,9 +144,8 @@ def detect_gpu_profile() -> GpuProfile:
 
     # classify hardware tier and performance profile
     if total_gb >= 20.0:
-        # workstation class (rtx 3090, 4090, a5000, a6000, a100, 6000 ada)
-        tier_name = "Ultra / Workstation (24GB+)"
-        tier_desc = "Unconstrained VRAM; high batch concurrency and full temporal window."
+        tier_name = "24GB+"
+        tier_desc = "Direct VRAM"
         low_vram = False
         chunk = 80
         stride = 40
@@ -155,9 +154,8 @@ def detect_gpu_profile() -> GpuProfile:
         swin_batch = 64
         ffmpeg_threads = min(12, max(4, cpu_cores // 2))
     elif total_gb >= 11.5:
-        # high-end desktop (rtx 3080/ti, 4070/ti, 4080)
-        tier_name = "High-End Desktop (12GB-16GB)"
-        tier_desc = "Direct VRAM execution with high batch throughput."
+        tier_name = "12GB-16GB"
+        tier_desc = "Direct VRAM"
         low_vram = False
         chunk = 64
         stride = 32
@@ -166,9 +164,8 @@ def detect_gpu_profile() -> GpuProfile:
         swin_batch = 32
         ffmpeg_threads = min(8, max(2, cpu_cores // 2))
     elif total_gb >= 7.5:
-        # standard desktop (rtx 3060, 3070, 4060, 2080)
-        tier_name = "Standard Desktop (8GB-10GB)"
-        tier_desc = "Direct in-memory execution for 1080p; stable multi-frame temporal window."
+        tier_name = "8GB-10GB"
+        tier_desc = "Direct VRAM"
         low_vram = False
         chunk = 32
         stride = 16
@@ -177,9 +174,8 @@ def detect_gpu_profile() -> GpuProfile:
         swin_batch = 32
         ffmpeg_threads = min(8, max(2, cpu_cores // 2))
     elif total_gb >= 5.0:
-        # mid-range / 6gb cards (gtx 1660, rtx 2060, mobile 6gb)
-        tier_name = "Mid-Range GPU (6GB)"
-        tier_desc = "Staged memory execution enabled with balanced temporal attention."
+        tier_name = "6GB"
+        tier_desc = "Staged Memory"
         low_vram = True
         chunk = 16
         stride = 8
@@ -188,9 +184,8 @@ def detect_gpu_profile() -> GpuProfile:
         swin_batch = 16
         ffmpeg_threads = min(6, max(2, cpu_cores // 2))
     else:
-        # entry-level / mobile 4gb cards (rtx 3050 mobile, gtx 1650)
-        tier_name = "Entry / Mobile GPU (4GB)"
-        tier_desc = "Staged disk-backed execution active to fit tight VRAM."
+        tier_name = "4GB"
+        tier_desc = "Staged Memory"
         low_vram = True
         chunk = 8
         stride = 4

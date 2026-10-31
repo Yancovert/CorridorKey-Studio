@@ -117,33 +117,31 @@ class MainWindow(QMainWindow):
                 height: 0px;
             }
             QGroupBox {
-                background-color: #0d1117;
-                border: 1px solid #28303d;
-                border-radius: 6px;
-                margin-top: 22px;
-                padding: 16px 12px 12px 12px;
-                font-weight: 700;
-                font-size: 12px;
-                color: #f0f6fc;
+                background-color: #12151a;
+                border: 1px solid #21262d;
+                border-radius: 5px;
+                margin-top: 16px;
+                padding: 14px 10px 10px 10px;
+                font-weight: 600;
+                font-size: 11.5px;
+                color: #c9d1d9;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                padding: 2px 8px;
-                left: 10px;
-                top: 4px;
-                background-color: #161b22;
-                border: 1px solid #364152;
-                border-radius: 4px;
-                color: #f0f6fc;
-                font-size: 11.5px;
-                font-weight: 700;
+                padding: 0px 6px;
+                left: 8px;
+                top: 2px;
+                background-color: #0b0e14;
+                color: #8b949e;
+                font-size: 11px;
+                font-weight: 600;
             }
             QComboBox {
                 background-color: #161b22;
                 border: 1px solid #30363d;
-                border-radius: 5px;
-                padding: 6px 10px;
+                border-radius: 4px;
+                padding: 5px 10px;
                 color: #f0f6fc;
                 font-size: 12px;
                 min-height: 22px;
@@ -153,7 +151,7 @@ class MainWindow(QMainWindow):
                 background-color: #1c212a;
             }
             QComboBox:focus {
-                border-color: #58a6ff;
+                border-color: #385175;
                 background-color: #161b22;
             }
             QComboBox::drop-down {
@@ -161,8 +159,8 @@ class MainWindow(QMainWindow):
                 subcontrol-position: top right;
                 width: 24px;
                 border-left: 1px solid #30363d;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
                 background-color: #1b212a;
             }
             QComboBox::down-arrow {
@@ -170,7 +168,7 @@ class MainWindow(QMainWindow):
                 height: 0px;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 5px solid #8b949e;
+                border-top: 5px solid #6e7681;
                 margin-right: 2px;
             }
             QComboBox::down-arrow:hover {
@@ -181,14 +179,14 @@ class MainWindow(QMainWindow):
                 border: 1px solid #30363d;
                 border-radius: 4px;
                 color: #f0f6fc;
-                selection-background-color: #1f6feb;
+                selection-background-color: #26354a;
                 selection-color: #ffffff;
                 padding: 4px;
             }
             QSpinBox, QDoubleSpinBox, QLineEdit {
                 background-color: #161b22;
                 border: 1px solid #30363d;
-                border-radius: 5px;
+                border-radius: 4px;
                 padding: 5px 10px;
                 color: #f0f6fc;
                 font-size: 12px;
@@ -199,7 +197,7 @@ class MainWindow(QMainWindow):
                 background-color: #1b212a;
             }
             QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {
-                border-color: #58a6ff;
+                border-color: #385175;
                 background-color: #161b22;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button {
@@ -238,29 +236,29 @@ class MainWindow(QMainWindow):
                 border-top: 4px solid #8b949e;
             }
             QCheckBox {
-                color: #e6edf3;
+                color: #c9d1d9;
                 font-size: 12px;
                 spacing: 8px;
             }
             QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
+                width: 15px;
+                height: 15px;
                 background-color: #161b22;
                 border: 1px solid #30363d;
-                border-radius: 4px;
+                border-radius: 3px;
             }
             QCheckBox::indicator:hover {
-                border-color: #58a6ff;
+                border-color: #484f58;
             }
             QCheckBox::indicator:checked {
-                background-color: #1f6feb;
-                border-color: #58a6ff;
+                background-color: #27384e;
+                border-color: #3e5677;
             }
             QPushButton {
                 background-color: #161b22;
                 color: #c9d1d9;
                 border: 1px solid #30363d;
-                border-radius: 5px;
+                border-radius: 4px;
                 padding: 6px 14px;
                 font-size: 12px;
                 font-weight: 500;
@@ -342,12 +340,12 @@ class MainWindow(QMainWindow):
         )
         header_bar.addWidget(self.gpu_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        self.open_output_btn = QPushButton("Open Outputs Folder")
+        self.open_output_btn = QPushButton("Output Folder")
         self.open_output_btn.setFixedHeight(28)
         self.open_output_btn.setToolTip("Open folder containing exported keying outputs")
         self.open_output_btn.setStyleSheet(
             "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
-            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 600; } "
+            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 500; } "
             "QPushButton:hover { background-color: #21262d; border-color: #484f58; color: #ffffff; }"
         )
         self.open_output_btn.clicked.connect(self._open_output_dir)
@@ -355,11 +353,11 @@ class MainWindow(QMainWindow):
 
         self.settings_btn = QPushButton("Settings")
         self.settings_btn.setFixedHeight(28)
-        self.settings_btn.setToolTip("Configure advanced engine defaults, custom presets, and maintenance")
+        self.settings_btn.setToolTip("Configure engine defaults, custom presets, and maintenance")
         self.settings_btn.setStyleSheet(
             "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
-            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 600; } "
-            "QPushButton:hover { background-color: #21262d; border-color: #58a6ff; color: #58a6ff; }"
+            "padding: 3px 12px; border-radius: 4px; font-size: 11.5px; font-weight: 500; } "
+            "QPushButton:hover { background-color: #21262d; border-color: #484f58; color: #ffffff; }"
         )
         self.settings_btn.clicked.connect(self._open_settings_dialog)
         header_bar.addWidget(self.settings_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
@@ -375,13 +373,10 @@ class MainWindow(QMainWindow):
         self.update_banner.setVisible(False)
         self.update_banner.setStyleSheet("""
             QFrame#updateBanner {
-                background-color: #0c1a11;
-                border-left: 4px solid #3fb950;
-                border-top: 1px solid #1f6f38;
-                border-right: 1px solid #1f6f38;
-                border-bottom: 1px solid #1f6f38;
-                border-radius: 6px;
-                margin: 2px 0px 6px 0px;
+                background-color: #161b22;
+                border: 1px solid #30363d;
+                border-radius: 5px;
+                margin: 2px 0px 4px 0px;
                 padding: 6px 12px;
             }
         """)
@@ -391,13 +386,13 @@ class MainWindow(QMainWindow):
 
         self.update_badge = QLabel("UPDATE")
         self.update_badge.setStyleSheet(
-            "background-color: #1a3824; color: #7ee787; font-size: 11px; font-weight: 700; "
-            "padding: 3px 8px; border-radius: 3px; border: none;"
+            "background-color: #21262d; color: #8b949e; font-size: 10.5px; font-weight: 700; "
+            "padding: 2px 6px; border-radius: 3px; border: 1px solid #30363d;"
         )
         ub_layout.addWidget(self.update_badge)
 
         self.update_label = QLabel("Update Available")
-        self.update_label.setStyleSheet("color: #f0f6fc; font-size: 12px; font-weight: 500; border: none; background: transparent;")
+        self.update_label.setStyleSheet("color: #c9d1d9; font-size: 12px; font-weight: 500; border: none; background: transparent;")
         ub_layout.addWidget(self.update_label)
 
         self.update_progress_bar = QProgressBar()
@@ -405,23 +400,23 @@ class MainWindow(QMainWindow):
         self.update_progress_bar.setValue(0)
         self.update_progress_bar.setMinimumWidth(240)
         self.update_progress_bar.setMaximumWidth(400)
-        self.update_progress_bar.setFixedHeight(18)
+        self.update_progress_bar.setFixedHeight(16)
         self.update_progress_bar.setTextVisible(True)
         self.update_progress_bar.setFormat("%p%")
         self.update_progress_bar.setVisible(False)
         self.update_progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #0b0f13;
-                border: 1px solid #1f6f38;
-                border-radius: 4px;
+                background-color: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 3px;
                 text-align: center;
-                color: #f0f6fc;
-                font-size: 11px;
-                font-weight: 700;
+                color: #c9d1d9;
+                font-size: 10.5px;
+                font-weight: 600;
             }
             QProgressBar::chunk {
-                background-color: #238636;
-                border-radius: 3px;
+                background-color: #364152;
+                border-radius: 2px;
             }
         """)
         ub_layout.addWidget(self.update_progress_bar)
@@ -429,23 +424,24 @@ class MainWindow(QMainWindow):
         ub_layout.addStretch()
 
         self.btn_update_now = QPushButton("Update Now")
-        self.btn_update_now.setFixedHeight(28)
+        self.btn_update_now.setFixedHeight(26)
         self.btn_update_now.setStyleSheet("""
             QPushButton {
-                background-color: #238636;
-                color: #ffffff;
-                font-weight: 700;
-                border: 1px solid #3fb950;
+                background-color: #21262d;
+                color: #f0f6fc;
+                font-weight: 600;
+                border: 1px solid #363d48;
                 border-radius: 4px;
-                padding: 4px 14px;
-                font-size: 12px;
+                padding: 3px 12px;
+                font-size: 11.5px;
             }
             QPushButton:hover {
-                background-color: #2ea043;
+                background-color: #30363d;
+                border-color: #484f58;
             }
             QPushButton:disabled {
-                background-color: #16241a;
-                color: #5b7f64;
+                background-color: #12151a;
+                color: #484f58;
                 border-color: #21262d;
             }
         """)
@@ -453,14 +449,14 @@ class MainWindow(QMainWindow):
         ub_layout.addWidget(self.btn_update_now)
 
         self.btn_update_dismiss = QPushButton("Dismiss")
-        self.btn_update_dismiss.setFixedHeight(28)
+        self.btn_update_dismiss.setFixedHeight(26)
         self.btn_update_dismiss.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 color: #8b949e;
                 border: none;
-                padding: 4px 10px;
-                font-size: 12px;
+                padding: 3px 8px;
+                font-size: 11.5px;
             }
             QPushButton:hover {
                 color: #f0f6fc;
@@ -496,14 +492,14 @@ class MainWindow(QMainWindow):
         controls_layout.setSpacing(12)
 
         # footage input box
-        input_group = QGroupBox("Footage Input")
+        input_group = QGroupBox("Input")
         input_layout = QVBoxLayout(input_group)
-        self.drop_area = QPushButton("Drop Video File or Browse...")
-        self.drop_area.setFixedHeight(54)
+        self.drop_area = QPushButton("Drop Video or Click to Browse")
+        self.drop_area.setFixedHeight(50)
         self.drop_area.setStyleSheet(
-            "QPushButton { border: 1.5px dashed #30363d; border-radius: 6px; "
-            "background-color: #161b22; color: #c9d1d9; font-size: 12.5px; font-weight: 600; } "
-            "QPushButton:hover { border-color: #58a6ff; background-color: #1c212c; color: #58a6ff; }"
+            "QPushButton { border: 1px dashed #30363d; border-radius: 4px; "
+            "background-color: #161b22; color: #c9d1d9; font-size: 12px; font-weight: 500; } "
+            "QPushButton:hover { border-color: #484f58; background-color: #1c2128; color: #f0f6fc; }"
         )
         self.drop_area.clicked.connect(self._browse_input)
         input_layout.addWidget(self.drop_area)
@@ -515,7 +511,7 @@ class MainWindow(QMainWindow):
 
         self.companion_hint_label = QLabel("")
         self.companion_hint_label.setVisible(False)
-        self.companion_hint_label.setStyleSheet("color: #3fb950; font-size: 11px; font-weight: 600;")
+        self.companion_hint_label.setStyleSheet("color: #8b949e; font-size: 11px; font-weight: 500;")
         self.companion_hint_label.setWordWrap(True)
         input_layout.addWidget(self.companion_hint_label)
 
@@ -524,47 +520,48 @@ class MainWindow(QMainWindow):
         # live resource budget banner
         self.vram_banner = QFrame()
         self.vram_banner.setStyleSheet(
-            "background-color: #0d1117; border: 1px solid #21262d; border-left: 3px solid #388bfd; border-radius: 6px; padding: 8px 12px;"
+            "background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; padding: 6px 10px;"
         )
         vram_box = QVBoxLayout(self.vram_banner)
         vram_box.setContentsMargins(0, 0, 0, 0)
-        vram_box.setSpacing(3)
-        self.vram_title = QLabel("VRAM Budget: Normal (~1.6 GB estimated)")
+        vram_box.setSpacing(2)
+        self.vram_title = QLabel("VRAM: Calculating...")
         self.vram_title.setWordWrap(True)
-        self.vram_title.setStyleSheet("font-weight: 600; color: #58a6ff; font-size: 12px;")
-        self.vram_detail = QLabel("Peak memory usage within hardware budget.")
+        self.vram_title.setStyleSheet("font-weight: 500; color: #8b949e; font-size: 11.5px;")
+        self.vram_detail = QLabel("")
         self.vram_detail.setStyleSheet("color: #8b949e; font-size: 11px;")
         self.vram_detail.setWordWrap(True)
+        self.vram_detail.setVisible(False)
         vram_box.addWidget(self.vram_title)
         vram_box.addWidget(self.vram_detail)
         controls_layout.addWidget(self.vram_banner)
 
         # workflow presets
-        preset_group = QGroupBox("Workflow Preset")
+        preset_group = QGroupBox("Preset")
         preset_layout = QVBoxLayout(preset_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.addItems([
-            "Balanced Studio (Hardware Optimized)",
-            "Maximum Quality (Fine Hair & Edges)",
-            "High-Performance Workstation (24GB+ / Multi-Batch)",
-            "Fast Turnaround (Speed & Quick Preview)",
-            "Low-VRAM Compatibility (4GB - 6GB Staged)",
-            "Custom Advanced Tuning",
+            "Balanced",
+            "Quality",
+            "High Throughput",
+            "Fast Preview",
+            "Low Memory",
+            "Custom",
         ])
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_preset_changed)
         preset_layout.addWidget(self.workflow_combo)
         controls_layout.addWidget(preset_group)
 
         # guidance and despill
-        guidance_group = QGroupBox("Guidance and Despill")
+        guidance_group = QGroupBox("Keying and Despill")
         guidance_layout = QVBoxLayout(guidance_group)
 
-        guidance_layout.addWidget(QLabel("Guidance Mode:"))
+        guidance_layout.addWidget(QLabel("Guidance:"))
         self.mode_combo = QComboBox()
         self.mode_combo.addItems([
-            "Automatic (No Hint)",
-            "First-Frame Mask Hint",
-            "Full Video Mask Hint",
+            "Auto",
+            "First Frame Mask",
+            "Video Mask Sequence",
         ])
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         guidance_layout.addWidget(self.mode_combo)
@@ -576,7 +573,7 @@ class MainWindow(QMainWindow):
 
         self.hint_label = QLabel("")
         self.hint_label.setVisible(False)
-        self.hint_label.setStyleSheet("color: #666666; font-size: 10px;")
+        self.hint_label.setStyleSheet("color: #8b949e; font-size: 11px;")
         guidance_layout.addWidget(self.hint_label)
 
         # despill slider + spinbox
@@ -589,54 +586,54 @@ class MainWindow(QMainWindow):
         self.despill_spin.setValue(0.50)
         self._sync_float_slider(self.despill_slider, self.despill_spin, 100.0)
         guidance_layout.addWidget(self._create_slider_param_row(
-            "Despill Strength:", self.despill_slider, self.despill_spin,
-            "Suppresses green or blue background bounce on hair, clothing, and skin."
+            "Despill Strength:", self.despill_slider, self.despill_spin, ""
         ))
 
         controls_layout.addWidget(guidance_group)
 
         # export deliverables
-        export_group = QGroupBox("Export Deliverables")
+        export_group = QGroupBox("Output")
         export_layout = QVBoxLayout(export_group)
 
         self.deliverable_combo = QComboBox()
         self.deliverable_combo.addItems([
-            "Blender: ProRes 4444 RGBA (Transparent Video)",
-            "Blender: PNG Sequence (Transparent Frames)",
-            "WebM: VP9 RGBA (Transparent Web Video)",
-            "QuickTime: Animation RLE (Lossless RGBA)",
-            "TIFF Sequence 16-bit (High Depth Archival)",
-            "DaVinci Resolve Matte Pack (Fill + External Matte)",
-            "OpenEXR Sequence (Linear 32-bit Float)",
-            "Standard Separate Passes (FG + Alpha MP4)",
+            "ProRes 4444 (RGBA)",
+            "PNG Sequence (RGBA)",
+            "WebM VP9 (RGBA)",
+            "QuickTime RLE (RGBA)",
+            "TIFF 16-bit (RGBA)",
+            "Matte Pack (Fill + Matte)",
+            "OpenEXR 32-bit (RGBA)",
+            "Separate Passes (FG + Alpha)",
         ])
         export_layout.addWidget(self.deliverable_combo)
 
-        self.blender_script_check = QCheckBox("Generate Blender Compositor Script (import_to_blender.py)")
+        self.blender_script_check = QCheckBox("Generate Blender import script")
         self.blender_script_check.setChecked(True)
         export_layout.addWidget(self.blender_script_check)
 
         out_row = QHBoxLayout()
         self.outdir_label = QLabel("Output: ./outputs")
-        self.outdir_label.setStyleSheet("color: #666666; font-size: 10px; font-family: monospace;")
+        self.outdir_label.setStyleSheet("color: #8b949e; font-size: 11px; font-family: monospace;")
         out_btn = QPushButton("Change...")
-        out_btn.setFixedHeight(22)
+        out_btn.setFixedHeight(24)
         out_btn.clicked.connect(self._browse_output_dir)
+        row_out_btn = QHBoxLayout()
         out_row.addWidget(self.outdir_label, stretch=1)
         out_row.addWidget(out_btn)
         export_layout.addLayout(out_row)
 
         controls_layout.addWidget(export_group)
 
-        # advanced engine tuning (collapsible accordion with brief dev text)
-        self.advanced_toggle_btn = QPushButton("▸ Advanced Engine Tuning")
+        # advanced engine tuning
+        self.advanced_toggle_btn = QPushButton("▸ Advanced Settings")
         self.advanced_toggle_btn.setCheckable(True)
         self.advanced_toggle_btn.setChecked(False)
         self.advanced_toggle_btn.setStyleSheet(
-            "QPushButton { background-color: #090909; border: 1px solid #1a1a1a; border-radius: 4px; "
-            "padding: 8px 12px; font-weight: 600; color: #888888; text-align: left; } "
-            "QPushButton:hover { background-color: #111111; border-color: #282828; color: #d0d0d0; } "
-            "QPushButton:checked { background-color: #101010; border-color: #303030; color: #ffffff; }"
+            "QPushButton { background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; "
+            "padding: 8px 12px; font-weight: 500; color: #8b949e; text-align: left; } "
+            "QPushButton:hover { background-color: #161b22; border-color: #30363d; color: #c9d1d9; } "
+            "QPushButton:checked { background-color: #161b22; border-color: #364152; color: #f0f6fc; }"
         )
         self.advanced_toggle_btn.toggled.connect(self._on_toggle_advanced)
         controls_layout.addWidget(self.advanced_toggle_btn)
@@ -656,9 +653,9 @@ class MainWindow(QMainWindow):
         btn_save_defaults.setFixedHeight(26)
         btn_save_defaults.setToolTip("Save current parameters as default application startup configuration")
         btn_save_defaults.setStyleSheet(
-            "QPushButton { background-color: #1b2e21; color: #7ee787; border: 1px solid #238636; "
-            "border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 600; } "
-            "QPushButton:hover { background-color: #238636; color: #ffffff; }"
+            "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
+            "border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 500; } "
+            "QPushButton:hover { background-color: #21262d; color: #ffffff; border-color: #484f58; }"
         )
         btn_save_defaults.clicked.connect(self._save_current_as_default)
         settings_bar.addWidget(btn_save_defaults)
@@ -682,7 +679,7 @@ class MainWindow(QMainWindow):
         btn_more_settings.setStyleSheet(
             "QPushButton { background-color: #161b22; color: #c9d1d9; border: 1px solid #30363d; "
             "border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 500; } "
-            "QPushButton:hover { background-color: #21262d; color: #58a6ff; border-color: #58a6ff; }"
+            "QPushButton:hover { background-color: #21262d; color: #ffffff; border-color: #484f58; }"
         )
         btn_more_settings.clicked.connect(self._open_settings_dialog)
         settings_bar.addWidget(btn_more_settings)
@@ -690,7 +687,7 @@ class MainWindow(QMainWindow):
         advanced_layout.addLayout(settings_bar)
 
         # 1. sampling and temporal windows
-        sampling_group = QGroupBox("Sampling and Temporal Windows")
+        sampling_group = QGroupBox("Temporal Windows")
         sampling_layout = QVBoxLayout(sampling_group)
 
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
@@ -702,15 +699,13 @@ class MainWindow(QMainWindow):
         self.scale_spin.setValue(1.0)
         self._sync_float_slider(self.scale_slider, self.scale_spin, 100.0)
         sampling_layout.addWidget(self._create_slider_param_row(
-            "Model Scale:", self.scale_slider, self.scale_spin,
-            "Resolution scale. 1.0 is native; 0.75 cuts memory; 1.25 for sub-pixel hair."
+            "Model Scale:", self.scale_slider, self.scale_spin, ""
         ))
 
         self.start_mode_combo = QComboBox()
-        self.start_mode_combo.addItems(["begin (Frame 0 -> N)", "middle (Center -> Edges)", "random_middle"])
+        self.start_mode_combo.addItems(["begin", "middle", "random_middle"])
         sampling_layout.addWidget(self._create_param_row(
-            "Processing Anchor:", self.start_mode_combo,
-            "Temporal direction. Middle anchors center frames for late subject entrances."
+            "Anchor:", self.start_mode_combo, ""
         ))
 
         self.chunk_slider = QSlider(Qt.Orientation.Horizontal)
@@ -721,8 +716,7 @@ class MainWindow(QMainWindow):
         self.chunk_spin.setValue(self.gpu_profile.recommended_chunk)
         self._sync_int_slider(self.chunk_slider, self.chunk_spin)
         sampling_layout.addWidget(self._create_slider_param_row(
-            "Hann Chunk:", self.chunk_slider, self.chunk_spin,
-            "Temporal analysis window size. Larger preserves continuity, requires more VRAM."
+            "Window Chunk:", self.chunk_slider, self.chunk_spin, ""
         ))
 
         self.stride_slider = QSlider(Qt.Orientation.Horizontal)
@@ -733,22 +727,20 @@ class MainWindow(QMainWindow):
         self.stride_spin.setValue(self.gpu_profile.recommended_stride)
         self._sync_int_slider(self.stride_slider, self.stride_spin)
         sampling_layout.addWidget(self._create_slider_param_row(
-            "Hann Stride:", self.stride_slider, self.stride_spin,
-            "Overlap stride between analysis windows. Smaller reduces popping."
+            "Window Stride:", self.stride_slider, self.stride_spin, ""
         ))
 
         self.num_frames_spin = QSpinBox()
         self.num_frames_spin.setRange(-1, 50000)
         self.num_frames_spin.setValue(-1)
         sampling_layout.addWidget(self._create_param_row(
-            "Limit Frames:", self.num_frames_spin,
-            "Process first N frames only (-1 for full video). Handy for quick tests."
+            "Limit Frames:", self.num_frames_spin, ""
         ))
 
         advanced_layout.addWidget(sampling_group)
 
         # 2. memory management
-        memory_group = QGroupBox("Memory Management")
+        memory_group = QGroupBox("Memory")
         memory_layout = QVBoxLayout(memory_group)
 
         self.low_vram_check = QCheckBox("Low-VRAM Staged Inference")
@@ -756,14 +748,10 @@ class MainWindow(QMainWindow):
         self.low_vram_check.stateChanged.connect(self._on_param_changed)
         memory_layout.addWidget(self.low_vram_check)
 
-        note_vram = QLabel("Splits computation into disk-backed staging passes for 4GB-6GB GPUs. Uncheck on 12GB+ GPUs for fastest in-memory execution.")
-        note_vram.setStyleSheet("color: #666666; font-size: 10px;")
-        memory_layout.addWidget(note_vram)
-
         advanced_layout.addWidget(memory_group)
 
         # 3. hardware concurrency and throughput
-        perf_group = QGroupBox("Hardware Concurrency and Throughput")
+        perf_group = QGroupBox("Performance")
         perf_layout = QVBoxLayout(perf_group)
 
         self.stage2_batch_slider = QSlider(Qt.Orientation.Horizontal)
@@ -774,8 +762,7 @@ class MainWindow(QMainWindow):
         self.stage2_batch_spin.setValue(self.gpu_profile.recommended_stage2_batch)
         self._sync_int_slider(self.stage2_batch_slider, self.stage2_batch_spin)
         perf_layout.addWidget(self._create_slider_param_row(
-            "Stage-2 Batch:", self.stage2_batch_slider, self.stage2_batch_spin,
-            "Parallel output frames rendered per stage-2 batch. Set to 2-4 on 16GB-24GB GPUs."
+            "Stage-2 Batch:", self.stage2_batch_slider, self.stage2_batch_spin, ""
         ))
 
         self.foundation_chunk_slider = QSlider(Qt.Orientation.Horizontal)
@@ -786,8 +773,7 @@ class MainWindow(QMainWindow):
         self.foundation_chunk_spin.setValue(self.gpu_profile.recommended_foundation_chunk)
         self._sync_int_slider(self.foundation_chunk_slider, self.foundation_chunk_spin)
         perf_layout.addWidget(self._create_slider_param_row(
-            "Foundation Chunk:", self.foundation_chunk_slider, self.foundation_chunk_spin,
-            "Chunk size for RVM / C-RADIO foundation passes. Set to 8-16 on high-end cards."
+            "Foundation Chunk:", self.foundation_chunk_slider, self.foundation_chunk_spin, ""
         ))
 
         self.swin_batch_spin = QSpinBox()
@@ -795,22 +781,20 @@ class MainWindow(QMainWindow):
         self.swin_batch_spin.setSingleStep(8)
         self.swin_batch_spin.setValue(self.gpu_profile.recommended_swin_batch)
         perf_layout.addWidget(self._create_param_row(
-            "Swin Window Batch:", self.swin_batch_spin,
-            "Swin attention batch size. Set to 32 or 64 on 12GB+ GPUs."
+            "Swin Batch:", self.swin_batch_spin, ""
         ))
 
         self.threads_spin = QSpinBox()
         self.threads_spin.setRange(0, 32)
         self.threads_spin.setValue(self.gpu_profile.recommended_ffmpeg_threads)
         perf_layout.addWidget(self._create_param_row(
-            "FFmpeg Threads:", self.threads_spin,
-            "CPU worker threads for video decode and encode pipes (0 = auto)."
+            "Worker Threads (0 = auto):", self.threads_spin, ""
         ))
 
         advanced_layout.addWidget(perf_group)
 
         # 4. color space and adjustments
-        color_group = QGroupBox("Color and Contrast")
+        color_group = QGroupBox("Color Adjustments")
         color_layout = QVBoxLayout(color_group)
 
         self.linear_check = QCheckBox("Linear Color Space Keying")
@@ -825,7 +809,7 @@ class MainWindow(QMainWindow):
         self.contrast_spin.setSingleStep(0.05)
         self.contrast_spin.setValue(1.0)
         self._sync_float_slider(self.contrast_slider, self.contrast_spin, 100.0)
-        color_layout.addWidget(self._create_slider_param_row("Linear Contrast:", self.contrast_slider, self.contrast_spin, "Optical contrast multiplier."))
+        color_layout.addWidget(self._create_slider_param_row("Contrast Multiplier:", self.contrast_slider, self.contrast_spin, ""))
 
         self.bright_slider = QSlider(Qt.Orientation.Horizontal)
         self.bright_slider.setRange(-100, 100)
@@ -835,7 +819,7 @@ class MainWindow(QMainWindow):
         self.bright_spin.setSingleStep(0.05)
         self.bright_spin.setValue(0.0)
         self._sync_float_slider(self.bright_slider, self.bright_spin, 100.0)
-        color_layout.addWidget(self._create_slider_param_row("Linear Brightness:", self.bright_slider, self.bright_spin, "Optical brightness offset."))
+        color_layout.addWidget(self._create_slider_param_row("Brightness Offset:", self.bright_slider, self.bright_spin, ""))
 
         advanced_layout.addWidget(color_group)
 
@@ -868,29 +852,28 @@ class MainWindow(QMainWindow):
         # action buttons
         btn_layout = QHBoxLayout()
         self.start_btn = QPushButton("Start Keying")
-        self.start_btn.setFixedHeight(44)
+        self.start_btn.setFixedHeight(40)
         self.start_btn.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2ea043, stop:1 #238636);
-                color: #ffffff;
-                font-weight: 700;
+                background-color: #26354a;
+                color: #f0f6fc;
+                font-weight: 600;
                 padding: 8px 18px;
-                border: 1px solid #3fb950;
+                border: 1px solid #385175;
                 border-radius: 6px;
-                font-size: 13.5px;
-                letter-spacing: 0.3px;
+                font-size: 13px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3fb950, stop:1 #2ea043);
-                border-color: #56d364;
+                background-color: #2d3f59;
+                border-color: #4a6a99;
                 color: #ffffff;
             }
             QPushButton:pressed {
-                background: #1b662a;
-                border-color: #238636;
+                background-color: #1e2b3c;
+                border-color: #26354a;
             }
             QPushButton:disabled {
-                background-color: #151b23;
+                background-color: #161b22;
                 color: #484f58;
                 border: 1px solid #21262d;
             }
@@ -899,13 +882,13 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.start_btn, stretch=3)
 
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setFixedHeight(44)
+        self.cancel_btn.setFixedHeight(40)
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #161b22;
-                color: #c9d1d9;
-                font-weight: 600;
+                color: #8b949e;
+                font-weight: 500;
                 padding: 8px 16px;
                 border: 1px solid #30363d;
                 border-radius: 6px;
@@ -1007,24 +990,24 @@ class MainWindow(QMainWindow):
         self.timeline_slider.setEnabled(False)
         self.timeline_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                height: 6px;
-                background: #161b22;
-                border-radius: 3px;
+                height: 4px;
+                background: #21262d;
+                border-radius: 2px;
             }
             QSlider::sub-page:horizontal {
-                background: #388bfd;
-                border-radius: 3px;
+                background: #385175;
+                border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: #58a6ff;
+                background: #8b949e;
                 border: 2px solid #0d1117;
-                width: 16px;
+                width: 14px;
                 margin-top: -5px;
                 margin-bottom: -5px;
-                border-radius: 8px;
+                border-radius: 7px;
             }
             QSlider::handle:horizontal:hover {
-                background: #79c0ff;
+                background: #c9d1d9;
             }
         """)
         self.timeline_slider.sliderMoved.connect(self._on_timeline_scrubbed)
@@ -1048,8 +1031,8 @@ class MainWindow(QMainWindow):
         self.btn_play_pause.setMinimumWidth(46)
         self.btn_play_pause.setEnabled(False)
         self.btn_play_pause.setStyleSheet(
-            "QPushButton { background-color: #1f6feb; border: 1px solid #388bfd; color: #ffffff; font-weight: bold; font-size: 13px; border-radius: 4px; } "
-            "QPushButton:hover { background-color: #388bfd; } "
+            "QPushButton { background-color: #21262d; border: 1px solid #30363d; color: #f0f6fc; font-weight: 600; font-size: 13px; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #30363d; color: #ffffff; border-color: #484f58; } "
             "QPushButton:disabled { background-color: #161b22; color: #484f58; border-color: #21262d; }"
         )
         self.btn_play_pause.clicked.connect(self._on_toggle_play_pause)
@@ -1069,7 +1052,7 @@ class MainWindow(QMainWindow):
         self.btn_loop.setMinimumWidth(52)
         self.btn_loop.setStyleSheet(
             "QPushButton { background-color: #161b22; color: #8b949e; border: 1px solid #30363d; padding: 2px 8px; font-size: 11px; font-weight: 600; } "
-            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #58a6ff; }"
+            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #385175; }"
         )
         transport_layout.addWidget(self.btn_loop)
 
@@ -1090,7 +1073,7 @@ class MainWindow(QMainWindow):
         self.btn_toggle_log.setMinimumWidth(46)
         self.btn_toggle_log.setStyleSheet(
             "QPushButton { background-color: #161b22; color: #8b949e; border: 1px solid #30363d; font-size: 11px; font-weight: 600; } "
-            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #58a6ff; }"
+            "QPushButton:checked { background-color: #21262d; color: #f0f6fc; border-color: #385175; }"
         )
         self.btn_toggle_log.toggled.connect(self._on_toggle_log)
         transport_layout.addWidget(self.btn_toggle_log)
@@ -1102,12 +1085,12 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(10)
+        self.progress_bar.setFixedHeight(8)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setVisible(False)
         self.progress_bar.setStyleSheet("""
-            QProgressBar { background-color: #0b0f14; border: 1px solid #21262d; border-radius: 5px; }
-            QProgressBar::chunk { background-color: #238636; border-radius: 4px; }
+            QProgressBar { background-color: #0b0e14; border: 1px solid #21262d; border-radius: 4px; }
+            QProgressBar::chunk { background-color: #385175; border-radius: 3px; }
         """)
         right_layout.addWidget(self.progress_bar)
 
@@ -1183,24 +1166,24 @@ class MainWindow(QMainWindow):
 
         slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                height: 6px;
-                background: #161b22;
-                border-radius: 3px;
+                height: 4px;
+                background: #21262d;
+                border-radius: 2px;
             }
             QSlider::sub-page:horizontal {
-                background: #388bfd;
-                border-radius: 3px;
+                background: #30363d;
+                border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: #58a6ff;
+                background: #8b949e;
                 border: 2px solid #0d1117;
-                width: 16px;
+                width: 14px;
                 margin-top: -5px;
                 margin-bottom: -5px;
-                border-radius: 8px;
+                border-radius: 7px;
             }
             QSlider::handle:horizontal:hover {
-                background: #79c0ff;
+                background: #c9d1d9;
             }
         """)
         row_layout.addWidget(slider)
@@ -1238,7 +1221,8 @@ class MainWindow(QMainWindow):
         if "stride" in data:
             self.stride_spin.setValue(int(data["stride"]))
         if "start_mode" in data:
-            idx = self.start_mode_combo.findText(data["start_mode"])
+            raw_mode = data["start_mode"].split()[0]
+            idx = self.start_mode_combo.findText(raw_mode)
             if idx >= 0:
                 self.start_mode_combo.setCurrentIndex(idx)
         if "low_vram" in data:
@@ -1260,7 +1244,14 @@ class MainWindow(QMainWindow):
         if "bright" in data:
             self.bright_spin.setValue(float(data["bright"]))
         if "deliverable" in data:
-            idx = self.deliverable_combo.findText(data["deliverable"])
+            deliv_val = data["deliverable"]
+            idx = self.deliverable_combo.findText(deliv_val)
+            if idx < 0:
+                for i in range(self.deliverable_combo.count()):
+                    item = self.deliverable_combo.itemText(i)
+                    if deliv_val.split()[0] in item or item.split()[0] in deliv_val:
+                        idx = i
+                        break
             if idx >= 0:
                 self.deliverable_combo.setCurrentIndex(idx)
         if "blender_script" in data:
@@ -1307,7 +1298,7 @@ class MainWindow(QMainWindow):
 
     def _on_toggle_advanced(self, checked: bool):
         self.advanced_container.setVisible(checked)
-        self.advanced_toggle_btn.setText("▾ Advanced Engine Tuning" if checked else "▸ Advanced Engine Tuning")
+        self.advanced_toggle_btn.setText("▾ Advanced Settings" if checked else "▸ Advanced Settings")
 
     def _on_toggle_log(self, checked: bool):
         self.log_container.setVisible(checked)
@@ -1413,22 +1404,20 @@ class MainWindow(QMainWindow):
 
         if is_safe:
             self.vram_banner.setStyleSheet(
-                "background-color: #0d1117; border: 1px solid #21262d; border-left: 3px solid #388bfd; border-radius: 6px; padding: 8px 12px;"
+                "background-color: #12151a; border: 1px solid #21262d; border-radius: 4px; padding: 6px 10px;"
             )
-            self.vram_title.setText(f"Hardware: {self.gpu_profile.name} ({avail} GB) - {self.gpu_profile.tier_name}")
-            self.vram_title.setStyleSheet("font-weight: 600; color: #58a6ff; font-size: 12px;")
-            self.vram_detail.setText(f"Peak footprint ~{peak_est} GB ({mode_str}). Fits comfortably inside dedicated VRAM.")
-            self.vram_detail.setStyleSheet("color: #8b949e; font-size: 11px;")
+            self.vram_title.setText(f"VRAM: ~{peak_est} GB / {avail} GB ({mode_str})")
+            self.vram_title.setStyleSheet("font-weight: 500; color: #8b949e; font-size: 11.5px;")
+            self.vram_detail.setVisible(False)
         else:
             self.vram_banner.setStyleSheet(
-                "background-color: #19120c; border: 1px solid #3d2314; border-left: 3px solid #d29922; border-radius: 6px; padding: 8px 12px;"
+                "background-color: #191410; border: 1px solid #3d2d1d; border-radius: 4px; padding: 6px 10px;"
             )
-            self.vram_title.setText(f"Hardware: {self.gpu_profile.name} ({avail} GB) - Memory Pressure")
-            self.vram_title.setStyleSheet("font-weight: 600; color: #f0883e; font-size: 12px;")
-            self.vram_detail.setText(
-                f"Peak footprint ~{peak_est} GB ({mode_str}) exceeds {avail} GB dedicated VRAM. System may use shared memory or encounter OOM."
-            )
+            self.vram_title.setText(f"VRAM: ~{peak_est} GB / {avail} GB (High Load)")
+            self.vram_title.setStyleSheet("font-weight: 500; color: #d29922; font-size: 11.5px;")
+            self.vram_detail.setText("Exceeds dedicated VRAM. Enable Low-VRAM if needed.")
             self.vram_detail.setStyleSheet("color: #d29922; font-size: 11px;")
+            self.vram_detail.setVisible(True)
 
     def _browse_input(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1697,14 +1686,13 @@ class MainWindow(QMainWindow):
         avail = self.gpu_profile.total_vram_gb
         if avail > 0 and peak_est > avail:
             box = QMessageBox(self)
-            box.setWindowTitle("Resource Notification")
+            box.setWindowTitle("Memory Warning")
             box.setText(
-                f"Estimated peak memory (~{peak_est} GB) exceeds detected dedicated GPU VRAM ({avail} GB).\n\n"
-                f"On workstation GPUs with unified memory or sufficient swap, you can proceed directly.\n\n"
-                f"To optimize automatically for your hardware tier ({self.gpu_profile.tier_name}), click 'Auto-Adapt to Hardware'."
+                f"Estimated memory (~{peak_est} GB) exceeds dedicated GPU VRAM ({avail} GB).\n\n"
+                f"Continue anyway or auto-adapt parameters?"
             )
-            proceed_btn = box.addButton("Proceed Anyway", QMessageBox.ButtonRole.AcceptRole)
-            adapt_btn = box.addButton("Auto-Adapt to Hardware", QMessageBox.ButtonRole.ActionRole)
+            proceed_btn = box.addButton("Proceed", QMessageBox.ButtonRole.AcceptRole)
+            adapt_btn = box.addButton("Auto-Adapt", QMessageBox.ButtonRole.ActionRole)
             box.addButton(QMessageBox.StandardButton.Cancel)
             box.exec()
 
@@ -1835,11 +1823,11 @@ class MainWindow(QMainWindow):
         self.pending_update_commit = remote_commit
         self.update_badge.setText("UPDATE")
         self.update_badge.setStyleSheet(
-            "background-color: #1a3824; color: #7ee787; font-size: 11px; font-weight: 700; "
-            "padding: 3px 8px; border-radius: 4px; border: none;"
+            "background-color: #21262d; color: #8b949e; font-size: 11px; font-weight: 600; "
+            "padding: 2px 6px; border-radius: 3px; border: 1px solid #30363d;"
         )
         self.update_label.setText(
-            f"New build available on {branch} ({remote_commit[:7]}). Current: {local_commit[:7]}."
+            f"Update available: {branch} ({remote_commit[:7]}). Installed: {local_commit[:7]}."
         )
         self.update_banner.setVisible(True)
 
@@ -1852,8 +1840,8 @@ class MainWindow(QMainWindow):
         self.btn_update_dismiss.setEnabled(False)
         self.update_badge.setText("UPDATING")
         self.update_badge.setStyleSheet(
-            "background-color: #153248; color: #58a6ff; font-size: 11px; font-weight: 700; "
-            "padding: 3px 8px; border-radius: 4px; border: none;"
+            "background-color: #21262d; color: #8b949e; font-size: 11px; font-weight: 600; "
+            "padding: 2px 6px; border-radius: 3px; border: 1px solid #30363d;"
         )
         self.update_label.setText("Starting update...")
         self.update_progress_bar.setVisible(True)
@@ -1876,11 +1864,11 @@ class MainWindow(QMainWindow):
             self.update_progress_bar.setVisible(True)
             self.update_badge.setText("READY")
             self.update_badge.setStyleSheet(
-                "background-color: #1a3824; color: #7ee787; font-size: 11px; font-weight: 700; "
-                "padding: 3px 8px; border-radius: 4px; border: none;"
+                "background-color: #1b2636; color: #8b949e; font-size: 11px; font-weight: 600; "
+                "padding: 2px 6px; border-radius: 3px; border: 1px solid #26354a;"
             )
-            self.update_label.setText(message)
-            self.btn_update_now.setText("Restart Studio")
+            self.update_label.setText("Update installed. Restart application.")
+            self.btn_update_now.setText("Restart")
             self.btn_update_now.setEnabled(True)
             try:
                 self.btn_update_now.clicked.disconnect()
@@ -1893,8 +1881,8 @@ class MainWindow(QMainWindow):
             self.update_progress_bar.setVisible(False)
             self.update_badge.setText("ERROR")
             self.update_badge.setStyleSheet(
-                "background-color: #3b1818; color: #ff7b72; font-size: 11px; font-weight: 700; "
-                "padding: 3px 8px; border-radius: 4px; border: none;"
+                "background-color: #2a1b1b; color: #f85149; font-size: 11px; font-weight: 600; "
+                "padding: 2px 6px; border-radius: 3px; border: 1px solid #3d2323;"
             )
             self.update_label.setText(f"Update failed: {message}")
             self.btn_update_now.setText("Retry")
