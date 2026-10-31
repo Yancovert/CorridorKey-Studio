@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor, QFont
+from PySide6.QtGui import QPalette, QColor, QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
 from .main_window import MainWindow
 
 
 def apply_dark_theme(app: QApplication):
+    # register bundled nunito sans fonts
+    fonts_dir = Path(__file__).resolve().parent / "fonts"
+    if fonts_dir.is_dir():
+        for font_path in sorted(fonts_dir.glob("*.ttf")):
+            QFontDatabase.addApplicationFont(str(font_path))
+
+    global_font = QFont("Nunito Sans", 10)
+    global_font.setStyleHint(QFont.StyleHint.SansSerif)
+    app.setFont(global_font)
+
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))

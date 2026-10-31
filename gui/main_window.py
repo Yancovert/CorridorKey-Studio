@@ -7,7 +7,7 @@ from pathlib import Path
 import cv2
 
 from PySide6.QtCore import Qt, QUrl, Slot, QTimer, QPointF
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QFont, QImage, QPixmap, QKeySequence, QShortcut
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QFont, QFontDatabase, QImage, QPixmap, QKeySequence, QShortcut, QPalette, QColor
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSlider, QCheckBox,
@@ -64,8 +64,31 @@ class MainWindow(QMainWindow):
         self._check_for_updates()
 
     def _setup_theme(self):
-        # oled black theme with subtle dark slate borders
+        # register bundled nunito sans fonts
+        fonts_dir = Path(__file__).resolve().parent / "fonts"
+        if fonts_dir.is_dir():
+            for font_path in sorted(fonts_dir.glob("*.ttf")):
+                QFontDatabase.addApplicationFont(str(font_path))
+
+        global_font = QFont("Nunito Sans", 10)
+        global_font.setStyleHint(QFont.StyleHint.SansSerif)
+        self.setFont(global_font)
+
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))
+        palette.setColor(QPalette.ColorRole.Base, QColor(0, 0, 0))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(10, 10, 10))
+        palette.setColor(QPalette.ColorRole.Text, QColor(210, 210, 210))
+        palette.setColor(QPalette.ColorRole.Button, QColor(18, 18, 18))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(220, 220, 220))
+        self.setPalette(palette)
+
+        # oled black theme with subtle dark slate borders and global nunito sans typography
         self.setStyleSheet("""
+            * {
+                font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            }
             QMainWindow, QWidget#centralWidget {
                 background-color: #000000;
                 color: #dcdcdc;
@@ -242,35 +265,94 @@ class MainWindow(QMainWindow):
 
         # update notification banner
         self.update_banner = QFrame()
+        self.update_banner.setObjectName("updateBanner")
         self.update_banner.setVisible(False)
-        self.update_banner.setStyleSheet(
-            "QFrame { background-color: #0c0c0c; border: 1px solid #282828; border-radius: 4px; padding: 3px 8px; }"
-        )
+        self.update_banner.setStyleSheet("""
+            QFrame#updateBanner {
+                background-color: #080c09;
+                border-left: 3px solid #238636;
+                border-top: 1px solid #142018;
+                border-right: 1px solid #142018;
+                border-bottom: 1px solid #142018;
+                border-radius: 4px;
+                margin: 2px 0px 4px 0px;
+                padding: 4px 10px;
+            }
+        """)
         ub_layout = QHBoxLayout(self.update_banner)
-        ub_layout.setContentsMargins(6, 2, 6, 2)
+        ub_layout.setContentsMargins(4, 2, 4, 2)
         ub_layout.setSpacing(10)
 
+        self.update_badge = QLabel("UPDATE")
+        self.update_badge.setStyleSheet(
+            "background-color: #1a3824; color: #7ee787; font-size: 10px; font-weight: 700; "
+            "padding: 2px 6px; border-radius: 3px; border: none;"
+        )
+        ub_layout.addWidget(self.update_badge)
+
         self.update_label = QLabel("Update Available")
-        self.update_label.setStyleSheet("color: #dcdcdc; font-size: 11px;")
+        self.update_label.setStyleSheet("color: #dcdcdc; font-size: 11px; border: none; background: transparent;")
         ub_layout.addWidget(self.update_label)
+
+        self.update_progress_bar = QProgressBar()
+        self.update_progress_bar.setRange(0, 100)
+        self.update_progress_bar.setValue(0)
+        self.update_progress_bar.setFixedWidth(140)
+        self.update_progress_bar.setFixedHeight(6)
+        self.update_progress_bar.setTextVisible(False)
+        self.update_progress_bar.setVisible(False)
+        self.update_progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #161b22;
+                border: 1px solid #21262d;
+                border-radius: 3px;
+            }
+            QProgressBar::chunk {
+                background-color: #238636;
+                border-radius: 2px;
+            }
+        """)
+        ub_layout.addWidget(self.update_progress_bar)
 
         ub_layout.addStretch()
 
         self.btn_update_now = QPushButton("Update Now")
-        self.btn_update_now.setFixedHeight(22)
-        self.btn_update_now.setStyleSheet(
-            "QPushButton { background-color: #1b3d26; color: #9be9a8; border: 1px solid #2d6b41; padding: 2px 8px; font-size: 10px; } "
-            "QPushButton:hover { background-color: #234f31; }"
-        )
+        self.btn_update_now.setFixedHeight(24)
+        self.btn_update_now.setStyleSheet("""
+            QPushButton {
+                background-color: #238636;
+                color: #ffffff;
+                font-weight: 600;
+                border: none;
+                border-radius: 3px;
+                padding: 3px 12px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #2ea043;
+            }
+            QPushButton:disabled {
+                background-color: #16241a;
+                color: #5b7f64;
+            }
+        """)
         self.btn_update_now.clicked.connect(self._on_click_update_now)
         ub_layout.addWidget(self.btn_update_now)
 
         self.btn_update_dismiss = QPushButton("Dismiss")
-        self.btn_update_dismiss.setFixedHeight(22)
-        self.btn_update_dismiss.setStyleSheet(
-            "QPushButton { background-color: #141414; color: #777777; border: 1px solid #1e1e1e; padding: 2px 8px; font-size: 10px; } "
-            "QPushButton:hover { color: #aaaaaa; border-color: #333333; }"
-        )
+        self.btn_update_dismiss.setFixedHeight(24)
+        self.btn_update_dismiss.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #7d8590;
+                border: none;
+                padding: 3px 8px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                color: #c9d1d9;
+            }
+        """)
         self.btn_update_dismiss.clicked.connect(lambda: self.update_banner.setVisible(False))
         ub_layout.addWidget(self.btn_update_dismiss)
         main_layout.addWidget(self.update_banner)
@@ -281,11 +363,17 @@ class MainWindow(QMainWindow):
 
         # left scrollable panel
         scroll_area = QScrollArea()
+        scroll_area.setObjectName("scrollArea")
         scroll_area.setWidgetResizable(True)
         scroll_area.setFixedWidth(380)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("QScrollArea#scrollArea { background-color: #000000; border: none; }")
+        scroll_area.viewport().setStyleSheet("background-color: #000000; border: none;")
 
         controls_widget = QWidget()
+        controls_widget.setObjectName("controlsWidget")
+        controls_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        controls_widget.setStyleSheet("QWidget#controlsWidget { background-color: #000000; }")
         controls_layout = QVBoxLayout(controls_widget)
         controls_layout.setContentsMargins(0, 0, 10, 0)
         controls_layout.setSpacing(10)
@@ -1488,8 +1576,13 @@ class MainWindow(QMainWindow):
     def _on_update_available(self, branch: str, remote_commit: str, local_commit: str, version: str):
         self.pending_update_branch = branch
         self.pending_update_commit = remote_commit
+        self.update_badge.setText("UPDATE")
+        self.update_badge.setStyleSheet(
+            "background-color: #1a3824; color: #7ee787; font-size: 10px; font-weight: 700; "
+            "padding: 2px 6px; border-radius: 3px; border: none;"
+        )
         self.update_label.setText(
-            f"Update Available: New build on {branch} ({remote_commit}). Current: {local_commit}."
+            f"New build available on {branch} ({remote_commit[:7]}). Current: {local_commit[:7]}."
         )
         self.update_banner.setVisible(True)
 
@@ -1499,32 +1592,58 @@ class MainWindow(QMainWindow):
 
         self.btn_update_now.setEnabled(False)
         self.btn_update_now.setText("Updating...")
+        self.update_progress_bar.setVisible(True)
+        self.update_progress_bar.setValue(10)
         repo_root = Path(__file__).resolve().parents[1]
         self.update_installer = UpdateInstallWorker(repo_root, self.pending_update_branch, self.pending_update_commit)
-        self.update_installer.install_progress.connect(self._on_update_progress)
-        self.update_installer.install_finished.connect(self._on_update_finished)
+        self.update_installer.progress.connect(self._on_update_progress)
+        self.update_installer.finished.connect(self._on_update_finished)
         self.update_installer.start()
 
-    @Slot(str)
-    def _on_update_progress(self, message: str):
+    @Slot(int, str)
+    def _on_update_progress(self, percent: int, message: str):
+        self.update_progress_bar.setValue(percent)
         self.update_label.setText(message)
 
     @Slot(bool, str)
     def _on_update_finished(self, success: bool, message: str):
+        self.update_progress_bar.setVisible(False)
         if success:
+            self.update_badge.setText("READY")
+            self.update_badge.setStyleSheet(
+                "background-color: #1a3824; color: #7ee787; font-size: 10px; font-weight: 700; "
+                "padding: 2px 6px; border-radius: 3px; border: none;"
+            )
             self.update_label.setText(message)
-            self.btn_update_now.setText("Restart Now")
+            self.btn_update_now.setText("Restart Studio")
             self.btn_update_now.setEnabled(True)
-            self.btn_update_now.clicked.disconnect()
+            try:
+                self.btn_update_now.clicked.disconnect()
+            except Exception:
+                pass
             self.btn_update_now.clicked.connect(self._restart_app)
+            self.btn_update_dismiss.setText("Later")
+            self.btn_update_dismiss.setEnabled(True)
         else:
+            self.update_badge.setText("ERROR")
+            self.update_badge.setStyleSheet(
+                "background-color: #3b1818; color: #ff7b72; font-size: 10px; font-weight: 700; "
+                "padding: 2px 6px; border-radius: 3px; border: none;"
+            )
             self.update_label.setText(f"Update failed: {message}")
             self.btn_update_now.setText("Retry")
             self.btn_update_now.setEnabled(True)
+            self.btn_update_dismiss.setEnabled(True)
 
     def _restart_app(self):
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen([sys.executable] + sys.argv)
+                QApplication.quit()
+            else:
+                os.execl(sys.executable, sys.executable, *sys.argv)
+        except Exception:
+            QApplication.quit()
 
     def closeEvent(self, event):
         if self.playback_timer.isActive():
