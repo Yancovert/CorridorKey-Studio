@@ -30,7 +30,11 @@ class UpdateCheckWorker(QThread):
             try:
                 for line in build_file.read_text(encoding="utf-8").splitlines():
                     line = line.strip()
-                    if line.startswith("commit="):
+                    if line.startswith("branch="):
+                        b = line.split("=", 1)[1].strip()
+                        if b in ("app-linux", "app-win"):
+                            target_branch = b
+                    elif line.startswith("commit="):
                         commit = line.split("=", 1)[1].strip()
                     elif line.startswith("version="):
                         version = line.split("=", 1)[1].strip()
@@ -83,29 +87,20 @@ class UpdateInstallWorker(QThread):
             git_dir = self.app_root / ".git"
 
             if git_dir.is_dir():
-                # git repository in-place pull
+                # git repository in-place pull strictly for platform branch
                 self.progress.emit(30, f"Pulling latest commits from origin/{self.branch}...")
                 pull_cmd = ["git", "-C", str(self.app_root), "pull", "origin", self.branch]
                 res = subprocess.run(pull_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
                 if res.returncode != 0:
-                    # fallback to master
-                    pull_master = ["git", "-C", str(self.app_root), "pull", "origin", "master"]
-                    res = subprocess.run(pull_master, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
-                    if res.returncode != 0:
-                        self.finished.emit(False, f"git pull failed: {res.stderr.strip()}")
-                        return
+                    self.finished.emit(False, f"git pull from {self.branch} failed: {res.stderr.strip()}")
+                    return
             else:
-                # extracted directory update via zip archive
+                # extracted directory update via zip archive strictly from platform branch
                 self.progress.emit(25, f"Downloading update archive for {self.branch}...")
                 archive_url = f"https://github.com/Yancovert/CorridorKey-Studio/archive/refs/heads/{self.branch}.zip"
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     zip_path = Path(tmp_dir) / "update.zip"
-                    try:
-                        urllib.request.urlretrieve(archive_url, zip_path)
-                    except Exception:
-                        # fallback to master archive
-                        archive_url = "https://github.com/Yancovert/CorridorKey-Studio/archive/refs/heads/master.zip"
-                        urllib.request.urlretrieve(archive_url, zip_path)
+                    urllib.request.urlretrieve(archive_url, zip_path)
 
                     self.progress.emit(60, "Extracting updated source code...")
                     with zipfile.ZipFile(zip_path, "r") as z:
