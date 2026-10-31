@@ -1654,6 +1654,13 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Starting CorridorKey inference...")
         self.log_text.clear()
 
+        # open log area so user sees real-time progress
+        if not self.btn_toggle_log.isChecked():
+            self.btn_toggle_log.setChecked(True)
+        self.log_container.setVisible(True)
+        self.log_text.append(f"Starting inference on: {Path(self.selected_input).name}")
+        self.log_text.append(f"Output directory: {self.output_dir}")
+
         formats = [
             "prores4444",
             "png_sequence",
@@ -1709,9 +1716,17 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _cancel_keying(self):
-        if self.worker:
+        if self.worker and self.worker.isRunning():
             self.status_label.setText("Cancelling inference...")
+            self.cancel_btn.setEnabled(False)
+            self._on_log("Cancelling inference process...")
             self.worker.cancel()
+        elif self.worker:
+            self.worker.cancel()
+            self.start_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(False)
+            self.progress_bar.setVisible(False)
+            self.status_label.setText("Ready")
 
     @Slot(int, str)
     def _on_progress(self, percent: int, message: str):
@@ -1721,6 +1736,8 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_log(self, text: str):
         self.log_text.append(text)
+        sb = self.log_text.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
     @Slot(bool, str, dict)
     def _on_finished(self, success: bool, message: str, outputs: dict):
@@ -1730,6 +1747,10 @@ class MainWindow(QMainWindow):
         self.status_label.setText(message)
 
         if success:
+            if self.selected_input:
+                self._try_load_existing_results(Path(self.selected_input).stem, None)
+                self._display_frame_at(self.current_frame_idx)
+
             msg = f"Keying finished successfully!\n\nDeliverables saved to:\n{self.output_dir}"
             if "prores4444" in outputs:
                 msg += f"\n- ProRes 4444: {Path(outputs['prores4444']).name}"
@@ -1744,13 +1765,16 @@ class MainWindow(QMainWindow):
             open_folder_btn = box.addButton("Open Output Folder", QMessageBox.ButtonRole.ActionRole)
             box.addButton(QMessageBox.StandardButton.Ok)
             box.setStyleSheet(
-                "QMessageBox { background-color: #0c0c0c; color: #dcdcdc; } "
-                "QPushButton { background-color: #1a1a1a; color: #e0e0e0; border: 1px solid #333333; padding: 6px 12px; border-radius: 4px; } "
-                "QPushButton:hover { background-color: #262626; }"
+                "QMessageBox { background-color: #1a1d21; color: #dce1e7; } "
+                "QPushButton { background-color: #21252b; color: #dce1e7; border: 1px solid #333942; padding: 6px 14px; border-radius: 4px; } "
+                "QPushButton:hover { background-color: #282d35; }"
             )
             box.exec()
             if box.clickedButton() == open_folder_btn:
                 self._open_output_dir()
+        elif "cancel" in message.lower():
+            self.status_label.setText("Keying cancelled.")
+            self._on_log("Keying process was cancelled by user.")
         else:
             self.log_container.setVisible(True)
             self.btn_toggle_log.setChecked(True)
