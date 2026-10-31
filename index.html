@@ -260,6 +260,98 @@
       font-size: 0.82rem;
       color: #666666;
     }
+
+    .slider-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin: 16px 0 6px;
+      user-select: none;
+      touch-action: none;
+      cursor: ew-resize;
+      background: #050505;
+    }
+
+    .slider-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .slider-before-wrap {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      overflow: hidden;
+      border-right: 2px solid #ffffff;
+      z-index: 2;
+    }
+
+    .slider-before-wrap img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: auto;
+      max-width: none;
+    }
+
+    .slider-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 36px;
+      height: 36px;
+      background: #0f141a;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: ew-resize;
+      z-index: 3;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .slider-handle svg {
+      width: 16px;
+      height: 16px;
+      fill: #ffffff;
+    }
+
+    .slider-pill {
+      position: absolute;
+      top: 10px;
+      padding: 4px 10px;
+      background: rgba(10, 10, 10, 0.82);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #e0e0e0;
+      z-index: 4;
+      pointer-events: none;
+      font-family: var(--font-mono);
+    }
+
+    .slider-pill-left {
+      left: 10px;
+    }
+
+    .slider-pill-right {
+      right: 10px;
+    }
   </style>
 </head>
 <body>
@@ -289,6 +381,23 @@
         CorridorKey Studio in action: live split preview, video timeline scrubber, transport controls, and one-click deliverables.
       </div>
     </div>
+
+    <h2>Live keying quality</h2>
+    <p>Drag the slider horizontally to compare raw green screen footage with the AI keyed result.</p>
+    <div class="slider-container" id="compare-slider">
+      <img src="assets/compare_after.jpg" alt="Keyed cutout result with clean edges" class="slider-img" id="slider-after-img">
+      <div class="slider-pill slider-pill-right">Keyed Result (Despilled)</div>
+
+      <div class="slider-before-wrap" id="slider-before-wrap">
+        <img src="assets/compare_before.jpg" alt="Original green screen footage" id="slider-before-img">
+      </div>
+      <div class="slider-pill slider-pill-left">Raw Green Screen</div>
+
+      <div class="slider-handle" id="slider-handle">
+        <svg viewBox="0 0 24 24"><path d="M8.5 7l-5 5 5 5V7zm7 10l5-5-5-5v10z"/></svg>
+      </div>
+    </div>
+    <p style="font-size: 0.82rem; color: #777777; margin-bottom: 24px;">High-resolution 1280x720 particle extraction demonstrating despilled semi-transparent edges and fine element isolation.</p>
 
     <h2>How to use</h2>
     <ol class="steps">
@@ -399,6 +508,14 @@ cd CorridorKey-Studio && ./CorridorKey-Studio-Installer-Linux
 git clone -b app-win https://github.com/Yancovert/CorridorKey-Studio.git
 cd CorridorKey-Studio && CorridorKey-Studio-Setup.exe</pre>
 
+
+    <div class="box" style="border-left: 3px solid #888888; margin-top: 36px; background: #0c0c0c;">
+      <p style="font-weight: 600; color: #ffffff; margin-bottom: 6px;">Notice: Non-Commercial & Personal Experimentation</p>
+      <p style="font-size: 0.84rem; color: #888888; margin-bottom: 0;">
+        CorridorKey Studio is an independent, non-commercial open-source project created strictly for personal research, educational experimentation, and community workflow development. It is not affiliated with, sponsored by, or endorsed by Corridor Digital, Zachary Harris, or Niko Pueringer. No commercial monetization, licensing, or commercial distribution is intended or offered. For the official commercial software, plugins, and production licenses, please visit <a href="https://corridorkey.com" target="_blank" rel="noopener">corridorkey.com</a>.
+      </p>
+    </div>
+
     <div class="footer">
       CorridorKey 2.0 neural model trained by Zachary Harris in direct collaboration with Niko and Corridor Digital.
       <br>
@@ -407,5 +524,50 @@ cd CorridorKey-Studio && CorridorKey-Studio-Setup.exe</pre>
       CorridorKey Studio source code on <a href="https://github.com/Yancovert/CorridorKey-Studio" target="_blank" rel="noopener">GitHub</a>.
     </div>
   </div>
+
+  <script>
+    (function() {
+      const container = document.getElementById("compare-slider");
+      const beforeWrap = document.getElementById("slider-before-wrap");
+      const beforeImg = document.getElementById("slider-before-img");
+      const handle = document.getElementById("slider-handle");
+
+      function syncImageWidth() {
+        if (container && beforeImg) {
+          beforeImg.style.width = container.offsetWidth + "px";
+        }
+      }
+      window.addEventListener("resize", syncImageWidth);
+      window.addEventListener("load", syncImageWidth);
+      setTimeout(syncImageWidth, 100);
+
+      let isDown = false;
+      function setSplit(clientX) {
+        const rect = container.getBoundingClientRect();
+        let x = clientX - rect.left;
+        if (x < 0) x = 0;
+        if (x > rect.width) x = rect.width;
+        const pct = (x / rect.width) * 100;
+        beforeWrap.style.width = pct + "%";
+        handle.style.left = pct + "%";
+      }
+
+      container.addEventListener("pointerdown", (e) => {
+        isDown = true;
+        container.setPointerCapture(e.pointerId);
+        setSplit(e.clientX);
+      });
+      container.addEventListener("pointermove", (e) => {
+        if (!isDown) return;
+        setSplit(e.clientX);
+      });
+      container.addEventListener("pointerup", (e) => {
+        isDown = false;
+        try { container.releasePointerCapture(e.pointerId); } catch (_) {}
+      });
+      container.addEventListener("pointercancel", () => { isDown = false; });
+    })();
+  </script>
 </body>
+
 </html>
